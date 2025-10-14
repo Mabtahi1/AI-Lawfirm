@@ -6,6 +6,46 @@ class SubscriptionManager:
     """Enhanced subscription manager with usage tracking"""
     
     def __init__(self):
+        self.subscription_manager = SubscriptionManager()
+    
+        # Add demo users for testing
+        if 'users' not in st.session_state:
+            st.session_state.users = {
+                'basic@demo.com': {
+                    'password': 'demo123',
+                    'data': {
+                        'name': 'Basic User',
+                        'email': 'basic@demo.com',
+                        'organization_code': 'ORG001',
+                        'is_subscription_owner': True
+                    }
+                },
+                'pro@demo.com': {
+                    'password': 'demo123',
+                    'data': {
+                        'name': 'Professional User',
+                        'email': 'pro@demo.com',
+                        'organization_code': 'ORG002',
+                        'is_subscription_owner': True
+                    }
+                },
+                'enterprise@demo.com': {
+                    'password': 'demo123',
+                    'data': {
+                        'name': 'Enterprise User',
+                        'email': 'enterprise@demo.com',
+                        'organization_code': 'ORG003',
+                        'is_subscription_owner': True
+                    }
+                }
+            }
+        
+        if 'subscriptions' not in st.session_state:
+            st.session_state.subscriptions = {
+                'ORG001': {'plan': 'basic', 'status': 'active'},
+                'ORG002': {'plan': 'professional', 'status': 'active'},
+                'ORG003': {'plan': 'enterprise', 'status': 'active'}
+            }
         # Initialize usage tracking in session state
         if 'feature_usage' not in st.session_state:
             st.session_state.feature_usage = {}
