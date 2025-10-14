@@ -150,6 +150,7 @@ class EnhancedAuthService:
     
     def show_login(self):
         """Show login page"""
+        
         st.markdown("""
         <div class="main-header">
             <h1>⚖️ LegalDoc Pro</h1>
@@ -157,33 +158,68 @@ class EnhancedAuthService:
         </div>
         """, unsafe_allow_html=True)
         
-        col1, col2, col3 = st.columns([1, 2, 1])
+        # Tabs for login and signup
+        tab1, tab2 = st.tabs(["🔐 Login", "✨ Sign Up"])
         
-        with col2:
-            st.subheader("Login")
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
+        with tab1:
+            col1, col2, col3 = st.columns([1, 2, 1])
             
-            if st.button("Login", use_container_width=True):
-                # Simple demo login
-                st.session_state.logged_in = True
-                st.session_state.user_data = {
-                    'name': 'Demo User',
-                    'email': email,
-                    'organization_code': 'ORG001',
-                    'is_subscription_owner': True
-                }
-                # Set default subscription for demo
-                if 'subscriptions' not in st.session_state:
-                    st.session_state.subscriptions = {}
+            with col2:
+                st.markdown("### Login to Your Account")
                 
-                # Demo: Set to professional plan
-                st.session_state.subscriptions['ORG001'] = {
-                    'plan': 'professional',  # Change to 'basic' or 'enterprise' to test
-                    'status': 'active',
-                    'start_date': datetime.now().isoformat()
-                }
-                st.rerun()
+                email = st.text_input("Email", placeholder="your@email.com")
+                password = st.text_input("Password", type="password")
+                
+                remember_me = st.checkbox("Remember me")
+                
+                if st.button("Login", use_container_width=True, type="primary"):
+                    # Check if user exists
+                    users = st.session_state.get('users', {})
+                    
+                    if email in users and users[email]['password'] == password:
+                        # Valid login
+                        user_data = users[email]['data']
+                        org_code = user_data['organization_code']
+                        
+                        # Get their subscription
+                        subscription = st.session_state.subscriptions.get(org_code, {})
+                        
+                        # Check if trial expired
+                        if subscription.get('status') == 'trial':
+                            from datetime import datetime
+                            trial_end = datetime.fromisoformat(subscription['trial_end_date'])
+                            if datetime.now() > trial_end:
+                                st.error("⚠️ Your trial has expired. Please update your payment information to continue.")
+                                if st.button("Update Payment"):
+                                    st.session_state['show_billing'] = True
+                                return
+                        
+                        # Log them in
+                        st.session_state.logged_in = True
+                        st.session_state.user_data = user_data
+                        st.session_state.current_page = 'Executive Dashboard'
+                        
+                        st.success(f"Welcome back, {user_data['first_name']}!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid email or password")
+                
+                st.markdown("---")
+                
+                col_link1, col_link2 = st.columns(2)
+                
+                with col_link1:
+                    if st.button("Forgot Password?", use_container_width=True):
+                        st.info("Password reset feature coming soon!")
+                
+                with col_link2:
+                    if st.button("Need Help?", use_container_width=True):
+                        st.info("Contact support@legaldocpro.com")
+        
+        with tab2:
+            # Import and show signup page
+            from pages.signup import show as show_signup
+            show_signup()
     
     
     def render_sidebar(self):
