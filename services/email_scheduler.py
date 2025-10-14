@@ -41,4 +41,5 @@ class EmailScheduler:
     
     def run_scheduled_tasks(self):
         """Run all scheduled email tasks"""
-        self.
+        self.check_trial_expiration()
+
