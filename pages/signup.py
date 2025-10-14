@@ -1,16 +1,73 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 from services.subscription_config import SUBSCRIPTION_PLANS
 from services.email_service import EmailService, AuthTokenManager
 
 def show():
     """Display signup page with plan selection"""
     
+    # Match main app styling
     st.markdown("""
-    <div class="main-header">
-        <h1>⚖️ Welcome to LegalDoc Pro</h1>
-        <p>Choose your plan and start managing your legal practice today</p>
-    </div>
+    <style>
+    /* Match main app background */
+    .stApp {
+        background: linear-gradient(135deg, 
+            #1a0b2e 0%,
+            #2d1b4e 15%,
+            #1e3a8a 35%,
+            #0f172a 50%,
+            #1e3a8a 65%,
+            #16537e 85%,
+            #0891b2 100%) !important;
+    }
+    
+    /* Light text everywhere */
+    * {
+        color: #e2e8f0 !important;
+    }
+    
+    h1, h2, h3 {
+        color: #f1f5f9 !important;
+    }
+    
+    /* Dark text in input fields */
+    input, textarea, select {
+        color: #1e293b !important;
+        background: white !important;
+    }
+    
+    /* Plan cards */
+    .plan-card {
+        background: rgba(30, 41, 59, 0.8);
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        border-radius: 16px;
+        padding: 2rem;
+        transition: all 0.3s ease;
+    }
+    
+    .plan-card:hover {
+        transform: translateY(-5px);
+        border-color: #3b82f6;
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4);
+    }
+    
+    .plan-popular {
+        border: 3px solid #3b82f6 !important;
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.5);
+        transform: scale(1.05);
+    }
+    
+    .plan-badge {
+        background: #3b82f6;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+        display: inline-block;
+        margin-bottom: 1rem;
+    }
+    </style>
     """, unsafe_allow_html=True)
     
     # Check if user already selected a plan
@@ -22,8 +79,17 @@ def show():
 def show_plan_selection():
     """Display plan selection cards"""
     
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem 0;">
+        <h1 style="font-size: 3rem; margin-bottom: 0.5rem;">⚖️ Welcome to LegalDoc Pro</h1>
+        <p style="font-size: 1.3rem; opacity: 0.9;">Choose your plan and start managing your legal practice today</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
     st.markdown("### 🚀 Choose Your Plan")
-    st.markdown("Select the plan that best fits your practice needs")
+    st.write("Select the plan that best fits your practice needs")
     
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -33,12 +99,6 @@ def show_plan_selection():
     plans = ['basic', 'professional', 'enterprise']
     columns = [col1, col2, col3]
     
-    plan_colors = {
-        'basic': '#6c757d',
-        'professional': '#007bff',
-        'enterprise': '#28a745'
-    }
-    
     plan_badges = {
         'basic': '📦 Starter',
         'professional': '⭐ Most Popular',
@@ -47,64 +107,57 @@ def show_plan_selection():
     
     for plan_name, col in zip(plans, columns):
         plan_details = SUBSCRIPTION_PLANS[plan_name]
+        is_popular = (plan_name == 'professional')
         
         with col:
-            # Highlight professional plan
-            is_popular = (plan_name == 'professional')
-            border_style = "3px solid #007bff" if is_popular else "2px solid #dee2e6"
+            # Plan card with conditional styling
+            card_class = "plan-card plan-popular" if is_popular else "plan-card"
             
-            st.markdown(f"""
-            <div style="
-                border: {border_style};
-                border-radius: 20px;
-                padding: 2rem;
-                background: white;
-                height: 100%;
-                position: relative;
-                box-shadow: {'0 8px 30px rgba(0,123,255,0.3)' if is_popular else '0 4px 15px rgba(0,0,0,0.1)'};
-                transform: {'scale(1.05)' if is_popular else 'scale(1)'};
-            ">
-                {f'<div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: {plan_colors[plan_name]}; color: white; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 0.85rem;">{plan_badges[plan_name]}</div>' if plan_name in plan_badges else ''}
+            with st.container():
+                # Badge
+                if plan_name in plan_badges:
+                    st.markdown(f"""
+                    <div style="text-align: center;">
+                        <span class="plan-badge">{plan_badges[plan_name]}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                <div style="text-align: center; margin-top: {'20px' if plan_name in plan_badges else '0'};">
-                    <h3 style="color: {plan_colors[plan_name]}; margin-bottom: 1rem;">{plan_details['name']}</h3>
-                    <h1 style="color: #2E86AB; margin: 1rem 0;">
-                        ${plan_details['price']}
-                        <span style="font-size: 1rem; color: #666;">/month</span>
-                    </h1>
-                    <p style="color: #666; min-height: 60px; font-size: 0.9rem;">{plan_details['description']}</p>
+                # Plan name and price
+                st.markdown(f"""
+                <div style="text-align: center; padding: 1rem 0;">
+                    <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">{plan_details['name']}</h3>
+                    <h1 style="font-size: 2.5rem; color: #60a5fa;">${plan_details['price']}</h1>
+                    <p style="opacity: 0.8;">per month</p>
+                    <p style="font-size: 0.9rem; min-height: 60px;">{plan_details['description']}</p>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            # Feature list
-            st.markdown("**✨ Features:**")
-            
-            key_features = get_plan_key_features(plan_name, plan_details)
-            
-            for feature in key_features:
-                st.markdown(f"✅ {feature}")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            # Select button
-            button_type = "primary" if is_popular else "secondary"
-            if st.button(
-                f"Select {plan_details['name']}", 
-                key=f"select_{plan_name}",
-                use_container_width=True,
-                type=button_type
-            ):
-                st.session_state.selected_plan = plan_name
-                st.rerun()
+                """, unsafe_allow_html=True)
+                
+                st.markdown("---")
+                
+                # Features
+                st.markdown("**✨ Features:**")
+                key_features = get_plan_key_features(plan_name, plan_details)
+                
+                for feature in key_features[:6]:  # Show first 6 features
+                    st.markdown(f"✅ {feature}")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # Select button
+                button_type = "primary" if is_popular else "secondary"
+                if st.button(
+                    f"Select {plan_details['name']}", 
+                    key=f"select_{plan_name}",
+                    use_container_width=True,
+                    type=button_type
+                ):
+                    st.session_state.selected_plan = plan_name
+                    st.rerun()
     
     # Comparison link
     st.markdown("---")
-    st.markdown("### 📊 Compare All Features")
     
-    if st.button("View Detailed Feature Comparison", use_container_width=True):
+    with st.expander("📊 View Detailed Feature Comparison"):
         show_feature_comparison()
 
 def get_plan_key_features(plan_name, plan_details):
@@ -115,6 +168,7 @@ def get_plan_key_features(plan_name, plan_details):
             f"{plan_details['limits']['max_matters']} active matters",
             f"{plan_details['limits']['max_documents']} documents",
             f"{plan_details['limits']['max_users']} team members",
+            f"{plan_details['limits']['storage_gb']} GB storage",
             "Document management",
             "Time & billing",
             "Client portal",
@@ -125,28 +179,28 @@ def get_plan_key_features(plan_name, plan_details):
             f"{plan_details['limits']['max_matters']} active matters",
             f"{plan_details['limits']['max_documents']} documents",
             f"{plan_details['limits']['max_users']} team members",
-            "Everything in Basic +",
-            f"🤖 {plan_details['limits']['case_comparisons_per_month']} AI case comparisons/mo",
+            f"{plan_details['limits']['storage_gb']} GB storage",
+            f"🤖 {plan_details['limits']['case_comparisons_per_month']} AI comparisons/mo",
             f"🤖 {plan_details['limits']['ai_insights_per_month']} AI insights/mo",
             "Business intelligence",
             "Priority support"
         ]
     else:  # enterprise
         return [
-            "♾️ Unlimited everything",
+            "♾️ Unlimited matters",
+            "♾️ Unlimited documents",
+            "♾️ Unlimited users",
+            "♾️ Unlimited storage",
             "♾️ Unlimited AI features",
-            "Everything in Professional +",
             "API access",
             "Custom integrations",
-            "White label options",
-            "24/7 dedicated support",
-            "Account manager"
+            "24/7 dedicated support"
         ]
 
 def show_feature_comparison():
     """Show detailed feature comparison table"""
     
-    st.markdown("### 📊 Detailed Feature Comparison")
+    import pandas as pd
     
     comparison_data = {
         'Feature': [
@@ -154,53 +208,33 @@ def show_feature_comparison():
             'Documents',
             'Team Members',
             'Storage',
-            'Document Management',
-            'Matter Management',
-            'Time & Billing',
-            'Calendar & Tasks',
-            'Client Portal',
             'AI Case Comparison',
             'AI Insights',
             'Advanced Search',
             'Business Intelligence',
-            'Integrations',
             'Mobile App',
             'API Access',
-            'White Label',
             'Support'
         ],
         'Basic': [
             '50', '500', '3', '10 GB',
-            '✅', '✅', '✅', '✅', '✅',
             '❌', '❌', '❌', '❌',
-            '❌', '❌', '❌', '❌',
-            'Email (48h)'
+            '❌', '❌', 'Email (48h)'
         ],
         'Professional': [
             '200', '5,000', '10', '100 GB',
-            '✅', '✅', '✅', '✅', '✅',
             '25/month', '50/month', '100/month', '✅',
-            '✅', '✅', '❌', '❌',
-            'Priority (24h)'
+            '✅', '❌', 'Priority (24h)'
         ],
         'Enterprise': [
             'Unlimited', 'Unlimited', 'Unlimited', 'Unlimited',
-            '✅', '✅', '✅', '✅', '✅',
             'Unlimited', 'Unlimited', 'Unlimited', '✅',
-            '✅', '✅', '✅', '✅',
-            '24/7 + Manager'
+            '✅', '✅', '24/7 + Manager'
         ]
     }
     
-    import pandas as pd
     df = pd.DataFrame(comparison_data)
-    
     st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    st.markdown("---")
-    
-    if st.button("← Back to Plan Selection"):
-        st.rerun()
 
 def show_signup_form():
     """Show signup form after plan selection"""
@@ -224,11 +258,8 @@ def show_signup_form():
         margin-bottom: 2rem;
         text-align: center;
     ">
-        <h3 style="margin: 0;">Selected Plan: {plan_details['name']}</h3>
-        <h2 style="margin: 0.5rem 0;">${plan_details['price']}/month</h2>
-        <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">
-            <a href="#" style="color: white; text-decoration: underline;" onclick="return false;">Change Plan</a>
-        </p>
+        <h3 style="margin: 0; color: white !important;">Selected Plan: {plan_details['name']}</h3>
+        <h2 style="margin: 0.5rem 0; color: white !important;">${plan_details['price']}/month</h2>
     </div>
     """, unsafe_allow_html=True)
     
@@ -238,101 +269,64 @@ def show_signup_form():
     
     st.markdown("### 📝 Create Your Account")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**Personal Information**")
-        first_name = st.text_input("First Name *", placeholder="John")
-        last_name = st.text_input("Last Name *", placeholder="Doe")
-        email = st.text_input("Email *", placeholder="john@lawfirm.com")
-        phone = st.text_input("Phone", placeholder="(555) 123-4567")
-    
-    with col2:
-        st.markdown("**Organization Information**")
-        org_name = st.text_input("Firm/Organization Name *", placeholder="Smith & Associates")
-        org_size = st.selectbox("Organization Size", [
-            "Solo Practitioner",
-            "2-5 attorneys",
-            "6-10 attorneys",
-            "11-25 attorneys",
-            "25+ attorneys"
-        ])
-        practice_area = st.multiselect("Practice Areas", [
-            "Corporate Law",
-            "Family Law",
-            "Criminal Defense",
-            "Personal Injury",
-            "Real Estate",
-            "Intellectual Property",
-            "Employment Law",
-            "Tax Law",
-            "Estate Planning",
-            "Other"
-        ])
-    
-    st.markdown("---")
-    st.markdown("**Security**")
-    
-    col_pass1, col_pass2 = st.columns(2)
-    
-    with col_pass1:
-        password = st.text_input("Password *", type="password", placeholder="Minimum 8 characters")
-    
-    with col_pass2:
-        confirm_password = st.text_input("Confirm Password *", type="password")
-    
-    st.markdown("---")
-    
-    # Terms and conditions
-    agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
-    marketing_emails = st.checkbox("Send me updates and marketing emails", value=True)
-    
-    st.markdown("---")
-    
-    # Payment information (for paid plans)
-    if selected_plan != 'free':
-        st.markdown("### 💳 Payment Information")
-        st.info("💡 14-day free trial - No credit card required! You can add payment information later.")
+    with st.form("signup_form"):
+        col1, col2 = st.columns(2)
         
-        # Uncomment below for actual payment collection
-        # col_card1, col_card2 = st.columns(2)
-        # with col_card1:
-        #     card_number = st.text_input("Card Number", placeholder="1234 5678 9012 3456")
-        #     card_name = st.text_input("Name on Card", placeholder="John Doe")
-        # with col_card2:
-        #     col_exp1, col_exp2, col_cvv = st.columns(3)
-        #     with col_exp1:
-        #         exp_month = st.selectbox("Month", list(range(1, 13)))
-        #     with col_exp2:
-        #         exp_year = st.selectbox("Year", list(range(2025, 2036)))
-        #     with col_cvv:
-        #         cvv = st.text_input("CVV", placeholder="123", max_chars=4)
-    
-    st.markdown("---")
-    
-    # Summary
-    col_summary1, col_summary2 = st.columns([2, 1])
-    
-    with col_summary1:
-        st.markdown("**Order Summary**")
-        st.write(f"Plan: {plan_details['name']}")
-        st.write(f"Billing: {plan_details['billing_cycle'].title()}")
+        with col1:
+            st.markdown("**Personal Information**")
+            first_name = st.text_input("First Name *", placeholder="John")
+            last_name = st.text_input("Last Name *", placeholder="Doe")
+            email = st.text_input("Email *", placeholder="john@lawfirm.com")
+            phone = st.text_input("Phone", placeholder="(555) 123-4567")
+        
+        with col2:
+            st.markdown("**Organization Information**")
+            org_name = st.text_input("Firm/Organization Name *", placeholder="Smith & Associates")
+            org_size = st.selectbox("Organization Size", [
+                "Solo Practitioner",
+                "2-5 attorneys",
+                "6-10 attorneys",
+                "11-25 attorneys",
+                "25+ attorneys"
+            ])
+            practice_area = st.multiselect("Practice Areas", [
+                "Corporate Law",
+                "Family Law",
+                "Criminal Defense",
+                "Personal Injury",
+                "Real Estate",
+                "Intellectual Property",
+                "Employment Law",
+                "Tax Law",
+                "Estate Planning",
+                "Other"
+            ])
+        
+        st.markdown("---")
+        st.markdown("**Security**")
+        
+        col_pass1, col_pass2 = st.columns(2)
+        
+        with col_pass1:
+            password = st.text_input("Password *", type="password", placeholder="Minimum 8 characters")
+        
+        with col_pass2:
+            confirm_password = st.text_input("Confirm Password *", type="password")
+        
+        st.markdown("---")
+        
+        # Terms and conditions
+        agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
+        marketing_emails = st.checkbox("Send me updates and marketing emails", value=True)
+        
+        # Payment info note
         if selected_plan != 'free':
-            st.write("First 14 days: **FREE**")
-            st.write(f"After trial: ${plan_details['price']}/month")
-    
-    with col_summary2:
-        st.markdown("**Today's Charge**")
-        st.markdown(f"<h2 style='color: #28a745; margin: 0;'>$0.00</h2>", unsafe_allow_html=True)
-        st.caption("Free trial - 14 days")
-    
-    st.markdown("---")
-    
-    # Submit button
-    col_submit1, col_submit2, col_submit3 = st.columns([1, 2, 1])
-    
-    with col_submit2:
-        if st.button("🚀 Start Free Trial", type="primary", use_container_width=True):
+            st.info("💡 14-day free trial - No credit card required! You can add payment information later.")
+        
+        # Submit button
+        submitted = st.form_submit_button("🚀 Start Free Trial", use_container_width=True, type="primary")
+        
+        if submitted:
             # Validation
             errors = []
             
@@ -367,15 +361,11 @@ def show_signup_form():
 
 def create_account(first_name, last_name, email, phone, org_name, org_size, practice_area, password, selected_plan):
     """Create new user account"""
-    """Create new user account with email verification"""
     
     # Generate organization code
     import random
     import string
     org_code = 'ORG' + ''.join(random.choices(string.digits, k=6))
-    
-    # Hash password
-    hashed_password = AuthTokenManager.hash_password(password)
     
     # Create user data
     user_data = {
@@ -391,7 +381,7 @@ def create_account(first_name, last_name, email, phone, org_name, org_size, prac
         'is_subscription_owner': True,
         'created_at': datetime.now().isoformat(),
         'trial_end_date': (datetime.now() + timedelta(days=14)).isoformat(),
-        'email_verified': False  # NEW
+        'email_verified': True  # Auto-verify for now
     }
     
     # Create subscription
@@ -410,6 +400,9 @@ def create_account(first_name, last_name, email, phone, org_name, org_size, prac
     if 'subscriptions' not in st.session_state:
         st.session_state.subscriptions = {}
     
+    # Hash password
+    hashed_password = AuthTokenManager.hash_password(password)
+    
     st.session_state.users[email] = {
         'password': hashed_password,
         'data': user_data
@@ -417,82 +410,7 @@ def create_account(first_name, last_name, email, phone, org_name, org_size, prac
     
     st.session_state.subscriptions[org_code] = subscription_data
     
-    # Generate verification token
-    email_service = EmailService()
-    verification_token = AuthTokenManager.create_verification_token(email)
-    
-    # Send verification email
-    email_sent = email_service.send_verification_email(email, verification_token)
-    
-    if email_sent:
-        st.success(f"""
-        ✅ Account created successfully!
-        
-        📧 We've sent a verification email to **{email}**.
-        
-        Please check your inbox and click the verification link to activate your account.
-        """)
-        
-        st.info("💡 Didn't receive the email? Check your spam folder or request a new one.")
-        
-        # Show resend button
-        if st.button("📨 Resend Verification Email"):
-            new_token = AuthTokenManager.create_verification_token(email)
-            email_service.send_verification_email(email, new_token)
-            st.success("Verification email resent!")
-    else:
-        st.warning("Account created, but we couldn't send the verification email. You can still log in.")
-        
-        # Auto-login in development
-        st.session_state.logged_in = True
-        st.session_state.user_data = user_data
-        st.session_state.current_page = 'Executive Dashboard'
-        st.rerun()
-    # Generate organization code
-    import random
-    import string
-    org_code = 'ORG' + ''.join(random.choices(string.digits, k=6))
-    
-    # Create user data
-    user_data = {
-        'name': f"{first_name} {last_name}",
-        'first_name': first_name,
-        'last_name': last_name,
-        'email': email,
-        'phone': phone,
-        'organization_code': org_code,
-        'organization_name': org_name,
-        'organization_size': org_size,
-        'practice_areas': practice_area,
-        'is_subscription_owner': True,
-        'created_at': datetime.now().isoformat(),
-        'trial_end_date': (datetime.now() + timedelta(days=14)).isoformat()
-    }
-    
-    # Create subscription
-    subscription_data = {
-        'plan': selected_plan,
-        'status': 'trial',
-        'start_date': datetime.now().isoformat(),
-        'trial_end_date': (datetime.now() + timedelta(days=14)).isoformat(),
-        'billing_cycle': 'monthly'
-    }
-    
-    # Store in session state (in production, save to database)
-    if 'users' not in st.session_state:
-        st.session_state.users = {}
-    
-    if 'subscriptions' not in st.session_state:
-        st.session_state.subscriptions = {}
-    
-    st.session_state.users[email] = {
-        'password': password,  # In production, hash this!
-        'data': user_data
-    }
-    
-    st.session_state.subscriptions[org_code] = subscription_data
-    
-    # Log the user in
+    # Log the user in immediately
     st.session_state.logged_in = True
     st.session_state.user_data = user_data
     st.session_state.current_page = 'Executive Dashboard'
@@ -501,7 +419,11 @@ def create_account(first_name, last_name, email, phone, org_name, org_size, prac
     st.success(f"✅ Account created successfully! Welcome to LegalDoc Pro, {first_name}!")
     st.balloons()
     
-    # Small delay then redirect
+    # Clean up
+    if 'selected_plan' in st.session_state:
+        del st.session_state.selected_plan
+    
+    # Redirect
     import time
     time.sleep(2)
     st.rerun()
