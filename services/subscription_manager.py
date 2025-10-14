@@ -190,7 +190,7 @@ class EnhancedAuthService:
     
     def show_login(self):
         """Show login page"""
-        
+    
         st.markdown("""
         <div class="main-header">
             <h1>⚖️ LegalDoc Pro</h1>
@@ -212,49 +212,75 @@ class EnhancedAuthService:
                 
                 remember_me = st.checkbox("Remember me")
                 
+                # Forgot password link
+                col_link1, col_link2 = st.columns([1, 1])
+                
+                with col_link2:
+                    if st.button("Forgot Password?", key="forgot_pass_link"):
+                        st.query_params.update({"page": "forgot_password"})
+                        st.rerun()
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                
                 if st.button("Login", use_container_width=True, type="primary"):
                     # Check if user exists
                     users = st.session_state.get('users', {})
                     
-                    if email in users and users[email]['password'] == password:
-                        # Valid login
-                        user_data = users[email]['data']
-                        org_code = user_data['organization_code']
+                    if email in users:
+                        # Verify password
+                        stored_password = users[email]['password']
                         
-                        # Get their subscription
-                        subscription = st.session_state.subscriptions.get(org_code, {})
-                        
-                        # Check if trial expired
-                        if subscription.get('status') == 'trial':
-                            from datetime import datetime
-                            trial_end = datetime.fromisoformat(subscription['trial_end_date'])
-                            if datetime.now() > trial_end:
-                                st.error("⚠️ Your trial has expired. Please update your payment information to continue.")
-                                if st.button("Update Payment"):
-                                    st.session_state['show_billing'] = True
+                        if AuthTokenManager.verify_password(password, stored_password):
+                            # Valid login
+                            user_data = users[email]['data']
+                            
+                            # Check if email verified
+                            if not user_data.get('email_verified', False):
+                                st.warning("⚠️ Please verify your email before logging in.")
+                                
+                                if st.button("📨 Resend Verification Email"):
+                                    email_service = EmailService()
+                                    verification_token = AuthTokenManager.create_verification_token(email)
+                                    email_service.send_verification_email(email, verification_token)
+                                    st.success("Verification email sent!")
                                 return
-                        
-                        # Log them in
-                        st.session_state.logged_in = True
-                        st.session_state.user_data = user_data
-                        st.session_state.current_page = 'Executive Dashboard'
-                        
-                        st.success(f"Welcome back, {user_data['first_name']}!")
-                        st.rerun()
+                            
+                            org_code = user_data['organization_code']
+                            
+                            # Get their subscription
+                            subscription = st.session_state.subscriptions.get(org_code, {})
+                            
+                            # Check if trial expired
+                            if subscription.get('status') == 'trial':
+                                from datetime import datetime
+                                trial_end = datetime.fromisoformat(subscription['trial_end_date'])
+                                if datetime.now() > trial_end:
+                                    st.error("⚠️ Your trial has expired. Please update your payment information to continue.")
+                                    if st.button("💳 Update Payment"):
+                                        st.session_state['show_billing'] = True
+                                    return
+                            
+                            # Log them in
+                            st.session_state.logged_in = True
+                            st.session_state.user_data = user_data
+                            st.session_state.current_page = 'Executive Dashboard'
+                            
+                            st.success(f"Welcome back, {user_data['first_name']}!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid email or password")
                     else:
                         st.error("❌ Invalid email or password")
                 
                 st.markdown("---")
                 
-                col_link1, col_link2 = st.columns(2)
+                col_help1, col_help2 = st.columns(2)
                 
-                with col_link1:
-                    if st.button("Forgot Password?", use_container_width=True):
-                        st.info("Password reset feature coming soon!")
+                with col_help1:
+                    st.caption("Don't have an account?")
                 
-                with col_link2:
-                    if st.button("Need Help?", use_container_width=True):
-                        st.info("Contact support@legaldocpro.com")
+                with col_help2:
+                    st.caption("[Need help?](mailto:support@legaldocpro.com)")
         
         with tab2:
             # Import and show signup page
