@@ -1,42 +1,55 @@
-from .subscription_config import SUBSCRIPTION_PLANS, FEATURE_DISPLAY
+from .subscription_config import SUBSCRIPTION_PLANS
 import streamlit as st
 from datetime import datetime
-from components.upgrade_modal import show_upgrade_modal, trigger_upgrade_modal
+
+# Import these at the top to avoid circular imports
+from services.email_service import AuthTokenManager, EmailService
 
 class SubscriptionManager:
     """Enhanced subscription manager with usage tracking"""
     
     def __init__(self):
-        self.subscription_manager = SubscriptionManager()
-    
-        # Add demo users for testing
+        # DON'T create another SubscriptionManager here!
+        # Just initialize usage tracking
+        
+        # Initialize usage tracking in session state
+        if 'feature_usage' not in st.session_state:
+            st.session_state.feature_usage = {}
+        
+        # Add demo users for testing (only once)
         if 'users' not in st.session_state:
             st.session_state.users = {
                 'basic@demo.com': {
-                    'password': 'demo123',
+                    'password': AuthTokenManager.hash_password('demo123'),
                     'data': {
                         'name': 'Basic User',
+                        'first_name': 'Basic',
                         'email': 'basic@demo.com',
                         'organization_code': 'ORG001',
-                        'is_subscription_owner': True
+                        'is_subscription_owner': True,
+                        'email_verified': True
                     }
                 },
                 'pro@demo.com': {
-                    'password': 'demo123',
+                    'password': AuthTokenManager.hash_password('demo123'),
                     'data': {
                         'name': 'Professional User',
+                        'first_name': 'Professional',
                         'email': 'pro@demo.com',
                         'organization_code': 'ORG002',
-                        'is_subscription_owner': True
+                        'is_subscription_owner': True,
+                        'email_verified': True
                     }
                 },
                 'enterprise@demo.com': {
-                    'password': 'demo123',
+                    'password': AuthTokenManager.hash_password('demo123'),
                     'data': {
                         'name': 'Enterprise User',
+                        'first_name': 'Enterprise',
                         'email': 'enterprise@demo.com',
                         'organization_code': 'ORG003',
-                        'is_subscription_owner': True
+                        'is_subscription_owner': True,
+                        'email_verified': True
                     }
                 }
             }
@@ -47,14 +60,9 @@ class SubscriptionManager:
                 'ORG002': {'plan': 'professional', 'status': 'active'},
                 'ORG003': {'plan': 'enterprise', 'status': 'active'}
             }
-        # Initialize usage tracking in session state
-        if 'feature_usage' not in st.session_state:
-            st.session_state.feature_usage = {}
     
     def get_organization_subscription(self, org_code):
         """Get subscription details for an organization"""
-        # This would typically come from a database
-        # For now, return from session state or default
         subscriptions = st.session_state.get('subscriptions', {})
         return subscriptions.get(org_code, {
             'plan': 'basic',
@@ -212,14 +220,6 @@ class EnhancedAuthService:
                 
                 remember_me = st.checkbox("Remember me")
                 
-                # Forgot password link
-                col_link1, col_link2 = st.columns([1, 1])
-                
-                with col_link2:
-                    if st.button("Forgot Password?", key="forgot_pass_link"):
-                        st.query_params.update({"page": "forgot_password"})
-                        st.rerun()
-                
                 st.markdown("<br>", unsafe_allow_html=True)
                 
                 if st.button("Login", use_container_width=True, type="primary"):
@@ -234,17 +234,6 @@ class EnhancedAuthService:
                             # Valid login
                             user_data = users[email]['data']
                             
-                            # Check if email verified
-                            if not user_data.get('email_verified', True):  # Default True for demo users
-                                st.warning("⚠️ Please verify your email before logging in.")
-                                
-                                if st.button("📨 Resend Verification Email"):
-                                    email_service = EmailService()
-                                    verification_token = AuthTokenManager.create_verification_token(email)
-                                    email_service.send_verification_email(email, verification_token)
-                                    st.success("Verification email sent!")
-                                return
-                            
                             org_code = user_data['organization_code']
                             
                             # Get their subscription
@@ -252,20 +241,20 @@ class EnhancedAuthService:
                             
                             # Check if trial expired
                             if subscription.get('status') == 'trial':
-                                from datetime import datetime
-                                trial_end = datetime.fromisoformat(subscription['trial_end_date'])
-                                if datetime.now() > trial_end:
-                                    st.error("⚠️ Your trial has expired. Please update your payment information to continue.")
-                                    if st.button("💳 Update Payment"):
-                                        st.session_state['show_billing'] = True
-                                    return
+                                trial_end_str = subscription.get('trial_end_date')
+                                if trial_end_str:
+                                    from datetime import datetime
+                                    trial_end = datetime.fromisoformat(trial_end_str)
+                                    if datetime.now() > trial_end:
+                                        st.error("⚠️ Your trial has expired. Please update your payment information to continue.")
+                                        return
                             
                             # Log them in
                             st.session_state.logged_in = True
                             st.session_state.user_data = user_data
                             st.session_state.current_page = 'Executive Dashboard'
                             
-                            st.success(f"Welcome back, {user_data['first_name']}!")
+                            st.success(f"Welcome back, {user_data.get('first_name', user_data['name'])}!")
                             st.rerun()
                         else:
                             st.error("❌ Invalid email or password")
@@ -273,19 +262,15 @@ class EnhancedAuthService:
                         st.error("❌ Invalid email or password")
                 
                 st.markdown("---")
-                
-                col_help1, col_help2 = st.columns(2)
-                
-                with col_help1:
-                    st.caption("Don't have an account?")
-                
-                with col_help2:
-                    st.caption("[Need help?](mailto:support@legaldocpro.com)")
+                st.caption("Don't have an account? Use the Sign Up tab above")
         
         with tab2:
             # Import and show signup page
-            from pages.signup import show as show_signup
-            show_signup()
+            try:
+                from pages.signup import show as show_signup
+                show_signup()
+            except:
+                st.info("Signup page coming soon. Use demo accounts for now.")
     
     def render_sidebar(self):
         """Render sidebar with subscription info"""
@@ -328,17 +313,6 @@ class EnhancedAuthService:
         
         plan_name = subscription.get('plan', 'basic')
         
-        # Show trial banner if on trial
-        if subscription.get('status') == 'trial':
-            from datetime import datetime
-            trial_end = datetime.fromisoformat(subscription['trial_end_date'])
-            days_left = (trial_end - datetime.now()).days
-            
-            if days_left > 0:
-                st.sidebar.warning(f"⏰ Trial: {days_left} days left")
-            else:
-                st.sidebar.error("⚠️ Trial Expired")
-        
         st.markdown("### 🧭 Navigation")
         
         # ========== BASIC FEATURES (All Plans) ==========
@@ -372,13 +346,9 @@ class EnhancedAuthService:
             can_use, status = self.subscription_manager.can_use_feature_with_limit(org_code, feature_name)
             
             if plan_name == 'basic':
-                # Basic plan users see locked features
-                if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
-                    # Trigger upgrade modal
-                    from components.upgrade_modal import trigger_upgrade_modal
-                    trigger_upgrade_modal(feature_name, button_text.replace('🔒', '').strip())
-                    st.rerun()
-                st.caption("⬆️ Upgrade to unlock")
+                # Basic plan users see locked features (no modal yet)
+                st.button(f"{button_text} 🔒", key=f"nav_{page_name}", disabled=True, use_container_width=True)
+                st.caption("⬆️ Upgrade to Professional")
             else:
                 # Professional and Enterprise users
                 if can_use:
@@ -393,10 +363,7 @@ class EnhancedAuthService:
                         st.rerun()
                 else:
                     # Professional plan - limit reached
-                    if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
-                        from components.upgrade_modal import trigger_upgrade_modal
-                        trigger_upgrade_modal(feature_name, button_text)
-                        st.rerun()
+                    st.button(f"{button_text} 🔒", key=f"nav_{page_name}", disabled=True, use_container_width=True)
                     st.caption(f"{status}")
         
         # ========== ENTERPRISE FEATURES ==========
