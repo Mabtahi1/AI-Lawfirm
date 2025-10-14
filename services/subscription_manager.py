@@ -185,6 +185,7 @@ class EnhancedAuthService:
                 }
                 st.rerun()
     
+    
     def render_sidebar(self):
         """Render sidebar with subscription info"""
         user_data = st.session_state.get('user_data', {})
@@ -208,7 +209,7 @@ class EnhancedAuthService:
             # Management options for subscription owners
             if user_data.get('is_subscription_owner'):
                 if st.button("💳 Billing & Subscription"):
-                    st.session_state['show_billing'] = True
+                    st.session_state['current_page'] = 'Billing Management'  # CHANGED THIS
                     st.rerun()
             
             if st.button("🚪 Logout"):
