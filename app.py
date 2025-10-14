@@ -458,6 +458,7 @@ page_modules = {
     "Executive Dashboard": safe_import_page("dashboard", "pages.dashboard"),
     "Document Management": safe_import_page("documents", "pages.documents"), 
     "Matter Management": safe_import_page("matters", "pages.matters"),
+    "Case Comparison": safe_import_page("case_comparison", "pages.case_comparison"),
     "Time & Billing": safe_import_page("billing", "pages.time_billing"),
     "AI Insights": safe_import_page("ai_insights", "pages.ai_insights"),
     "Calendar & Tasks": safe_import_page("calendar_tasks", "pages.calendar_tasks"),
