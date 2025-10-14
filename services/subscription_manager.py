@@ -416,7 +416,53 @@ class EnhancedAuthService:
             st.markdown("---")
             st.markdown("**Enterprise Features 🔒**")
             st.caption("Available in Enterprise plan")
+
+        # ========== AI FEATURES ==========
+    st.markdown("---")
+    st.markdown("**AI-Powered Features**")
     
+    ai_features = [
+        ("🤖 AI Insights", "AI Insights", "ai_insights"),
+        ("🔍 Case Comparison", "Case Comparison", "case_comparison"),
+        ("🔎 Advanced Search", "Advanced Search", "advanced_search"),
+        ("📊 Business Intel", "Business Intelligence", "business_intelligence")
+    ]
+    
+    for button_text, page_name, feature_name in ai_features:
+        can_use, status = self.subscription_manager.can_use_feature_with_limit(org_code, feature_name)
+        
+        if plan_name == 'basic':
+            # Basic plan - show upgrade prompt on click
+            if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
+                trigger_upgrade_modal(feature_name, button_text.replace('🔒', '').strip())
+                st.rerun()
+            st.caption("⬆️ Upgrade to unlock")
+        else:
+            # Professional/Enterprise plans
+            if can_use:
+                if plan_name == 'professional' and status != 'unlimited':
+                    display_text = f"{button_text} ({status})"
+                else:
+                    display_text = button_text
+                
+                if st.button(display_text, key=f"nav_{page_name}", use_container_width=True):
+                    st.session_state['current_page'] = page_name
+                    st.rerun()
+            else:
+                # Limit reached - show upgrade to Enterprise
+                if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
+                    trigger_upgrade_modal(feature_name, button_text)
+                    st.rerun()
+                st.caption(f"{status}")
+    
+    # Check if we should show upgrade modal
+    if 'show_upgrade_modal' in st.session_state:
+        modal_data = st.session_state['show_upgrade_modal']
+        show_upgrade_modal(
+            plan_name,
+            modal_data['feature_name'],
+            modal_data['feature_display_name']
+        )
     def show_user_settings(self):
         """Show user settings modal"""
         pass
