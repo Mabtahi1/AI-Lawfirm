@@ -1,6 +1,7 @@
 from .subscription_config import SUBSCRIPTION_PLANS, FEATURE_DISPLAY
 import streamlit as st
 from datetime import datetime
+from components.upgrade_modal import show_upgrade_modal, trigger_upgrade_modal
 
 class SubscriptionManager:
     """Enhanced subscription manager with usage tracking"""
