@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime
 from services.subscription_config import SUBSCRIPTION_PLANS
+from services.email_service import EmailService, AuthTokenManager
 
 def show():
     """Display signup page with plan selection"""
@@ -366,7 +367,87 @@ def show_signup_form():
 
 def create_account(first_name, last_name, email, phone, org_name, org_size, practice_area, password, selected_plan):
     """Create new user account"""
+    """Create new user account with email verification"""
     
+    # Generate organization code
+    import random
+    import string
+    org_code = 'ORG' + ''.join(random.choices(string.digits, k=6))
+    
+    # Hash password
+    hashed_password = AuthTokenManager.hash_password(password)
+    
+    # Create user data
+    user_data = {
+        'name': f"{first_name} {last_name}",
+        'first_name': first_name,
+        'last_name': last_name,
+        'email': email,
+        'phone': phone,
+        'organization_code': org_code,
+        'organization_name': org_name,
+        'organization_size': org_size,
+        'practice_areas': practice_area,
+        'is_subscription_owner': True,
+        'created_at': datetime.now().isoformat(),
+        'trial_end_date': (datetime.now() + timedelta(days=14)).isoformat(),
+        'email_verified': False  # NEW
+    }
+    
+    # Create subscription
+    subscription_data = {
+        'plan': selected_plan,
+        'status': 'trial',
+        'start_date': datetime.now().isoformat(),
+        'trial_end_date': (datetime.now() + timedelta(days=14)).isoformat(),
+        'billing_cycle': 'monthly'
+    }
+    
+    # Store in session state
+    if 'users' not in st.session_state:
+        st.session_state.users = {}
+    
+    if 'subscriptions' not in st.session_state:
+        st.session_state.subscriptions = {}
+    
+    st.session_state.users[email] = {
+        'password': hashed_password,
+        'data': user_data
+    }
+    
+    st.session_state.subscriptions[org_code] = subscription_data
+    
+    # Generate verification token
+    email_service = EmailService()
+    verification_token = AuthTokenManager.create_verification_token(email)
+    
+    # Send verification email
+    email_sent = email_service.send_verification_email(email, verification_token)
+    
+    if email_sent:
+        st.success(f"""
+        ✅ Account created successfully!
+        
+        📧 We've sent a verification email to **{email}**.
+        
+        Please check your inbox and click the verification link to activate your account.
+        """)
+        
+        st.info("💡 Didn't receive the email? Check your spam folder or request a new one.")
+        
+        # Show resend button
+        if st.button("📨 Resend Verification Email"):
+            new_token = AuthTokenManager.create_verification_token(email)
+            email_service.send_verification_email(email, new_token)
+            st.success("Verification email resent!")
+    else:
+        st.warning("Account created, but we couldn't send the verification email. You can still log in.")
+        
+        # Auto-login in development
+        st.session_state.logged_in = True
+        st.session_state.user_data = user_data
+        st.session_state.current_page = 'Executive Dashboard'
+        st.rerun()
     # Generate organization code
     import random
     import string
