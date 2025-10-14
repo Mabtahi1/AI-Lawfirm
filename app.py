@@ -470,7 +470,7 @@ page_modules = {
     "System Settings": safe_import_page("settings", "pages.system_settings"),
     "Client Dashboard": safe_import_page("client_dashboard", "pages.client_dashboard"),
     "My Documents": safe_import_page("my_documents", "pages.my_documents"),
-    "Billing": safe_import_page("billing_view", "pages.billing_view"),
+    "Billing Management": safe_import_page("billing_management", "pages.billing_management"),
     "Messages": safe_import_page("messages", "pages.messages")
 }
 
