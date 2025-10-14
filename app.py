@@ -2,6 +2,16 @@ import streamlit as st
 import sys
 import os
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Import auth token manager for password reset and verification
+from services.email_service import AuthTokenManager, EmailService
+from services.subscription_config import SUBSCRIPTION_PLANS
+
 
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
