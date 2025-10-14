@@ -2,6 +2,7 @@ import streamlit as st
 from services.subscription_manager import SubscriptionManager
 from services.subscription_config import SUBSCRIPTION_PLANS
 from datetime import datetime
+from services.payment_service import PaymentService
 
 def show():
     """Display billing and subscription management page"""
@@ -22,7 +23,12 @@ def show():
     current_plan = subscription.get('plan', 'basic')
     
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["📊 Current Plan", "🚀 Upgrade Options", "📈 Usage History"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📊 Current Plan", 
+        "🚀 Upgrade Options", 
+        "📈 Usage History",
+        "💳 Payment Methods"  # NEW TAB
+    ])
     
     with tab1:
         show_current_plan(subscription_manager, org_code, current_plan)
@@ -32,6 +38,138 @@ def show():
     
     with tab3:
         show_usage_history(subscription_manager, org_code)
+    with tab4:
+        show_payment_methods(subscription_manager, org_code, current_plan)
+
+def show_payment_methods(subscription_manager, org_code, current_plan):
+    """Show and manage payment methods"""
+    
+    st.markdown("### 💳 Payment Methods")
+    
+    payment_service = PaymentService()
+    subscription = subscription_manager.get_organization_subscription(org_code)
+    
+    # Check if on trial
+    if subscription.get('status') == 'trial':
+        from datetime import datetime
+        trial_end = datetime.fromisoformat(subscription['trial_end_date'])
+        days_left = (trial_end - datetime.now()).days
+        
+        if days_left > 0:
+            st.info(f"""
+            ⏰ **You're on a free trial**
+            
+            Your trial ends in **{days_left} days**. Add a payment method to continue after your trial.
+            """)
+        else:
+            st.warning("⚠️ **Your trial has expired**. Add a payment method to continue using premium features.")
+    
+    # Show existing payment methods
+    st.markdown("#### Your Payment Methods")
+    
+    # Mock payment methods (in production, fetch from Stripe)
+    payment_methods = st.session_state.get('payment_methods', {}).get(org_code, [])
+    
+    if payment_methods:
+        for idx, method in enumerate(payment_methods):
+            col1, col2, col3 = st.columns([3, 2, 1])
+            
+            with col1:
+                st.write(f"**{method['brand']} ending in {method['last4']}**")
+                st.caption(f"Expires {method['exp_month']}/{method['exp_year']}")
+            
+            with col2:
+                if method.get('default'):
+                    st.success("✅ Default")
+                else:
+                    if st.button("Set as Default", key=f"default_{idx}"):
+                        # Set as default
+                        for pm in payment_methods:
+                            pm['default'] = False
+                        method['default'] = True
+                        st.rerun()
+            
+            with col3:
+                if st.button("🗑️", key=f"delete_{idx}"):
+                    payment_methods.pop(idx)
+                    st.rerun()
+            
+            st.markdown("---")
+    else:
+        st.info("No payment methods on file")
+    
+    # Add new payment method
+    st.markdown("#### ➕ Add Payment Method")
+    
+    with st.expander("Add New Card"):
+        with st.form("add_payment_method"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                card_number = st.text_input("Card Number", placeholder="4242 4242 4242 4242")
+                card_name = st.text_input("Name on Card")
+            
+            with col2:
+                col_exp1, col_exp2 = st.columns(2)
+                with col_exp1:
+                    exp_month = st.selectbox("Month", list(range(1, 13)))
+                with col_exp2:
+                    exp_year = st.selectbox("Year", list(range(2025, 2036)))
+                
+                cvv = st.text_input("CVV", max_chars=4, placeholder="123")
+            
+            set_default = st.checkbox("Set as default payment method", value=len(payment_methods) == 0)
+            
+            submitted = st.form_submit_button("💾 Save Card", use_container_width=True, type="primary")
+            
+            if submitted:
+                if not card_number or len(card_number.replace(" ", "")) != 16:
+                    st.error("Please enter a valid card number")
+                elif not cvv or len(cvv) < 3:
+                    st.error("Please enter a valid CVV")
+                else:
+                    # Add payment method
+                    new_method = {
+                        'brand': 'Visa' if card_number[0] == '4' else 'Mastercard',
+                        'last4': card_number.replace(" ", "")[-4:],
+                        'exp_month': exp_month,
+                        'exp_year': exp_year,
+                        'default': set_default or len(payment_methods) == 0
+                    }
+                    
+                    if 'payment_methods' not in st.session_state:
+                        st.session_state.payment_methods = {}
+                    
+                    if org_code not in st.session_state.payment_methods:
+                        st.session_state.payment_methods[org_code] = []
+                    
+                    # If setting as default, remove default from others
+                    if new_method['default']:
+                        for pm in st.session_state.payment_methods[org_code]:
+                            pm['default'] = False
+                    
+                    st.session_state.payment_methods[org_code].append(new_method)
+                    
+                    # If trial expired, activate subscription
+                    if subscription.get('status') == 'trial':
+                        from datetime import datetime
+                        trial_end = datetime.fromisoformat(subscription['trial_end_date'])
+                        if datetime.now() > trial_end:
+                            subscription['status'] = 'active'
+                            
+                            # Send payment success email
+                            user_data = st.session_state.get('user_data', {})
+                            email_service = EmailService()
+                            plan_details = SUBSCRIPTION_PLANS[current_plan]
+                            email_service.send_payment_success_email(
+                                user_data['email'],
+                                user_data['first_name'],
+                                plan_details['price'],
+                                plan_details['name']
+                            )
+                    
+                    st.success("✅ Payment method added successfully!")
+                    st.rerun()
 
 def show_current_plan(subscription_manager, org_code, current_plan):
     """Display current subscription plan details"""
