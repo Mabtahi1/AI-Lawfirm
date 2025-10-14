@@ -263,6 +263,17 @@ class EnhancedAuthService:
         
         plan_name = subscription.get('plan', 'basic')
         
+        # Show trial banner if on trial
+        if subscription.get('status') == 'trial':
+            from datetime import datetime
+            trial_end = datetime.fromisoformat(subscription['trial_end_date'])
+            days_left = (trial_end - datetime.now()).days
+            
+            if days_left > 0:
+                st.sidebar.warning(f"⏰ Trial: {days_left} days left")
+            else:
+                st.sidebar.error("⚠️ Trial Expired")
+        
         st.markdown("### 🧭 Navigation")
         
         # ========== BASIC FEATURES (All Plans) ==========
@@ -281,7 +292,7 @@ class EnhancedAuthService:
                 st.session_state['current_page'] = page_name
                 st.rerun()
         
-        # ========== AI FEATURES (Professional & Enterprise) ==========
+        # ========== AI FEATURES (Professional & Enterprise ONLY) ==========
         st.markdown("---")
         st.markdown("**AI-Powered Features**")
         
@@ -295,22 +306,29 @@ class EnhancedAuthService:
         for button_text, page_name, feature_name in ai_features:
             can_use, status = self.subscription_manager.can_use_feature_with_limit(org_code, feature_name)
             
-            if can_use:
-                # Show usage status for Professional plan
-                if plan_name == 'professional' and status != 'unlimited':
-                    display_text = f"{button_text} ({status})"
-                else:
-                    display_text = button_text
-                
-                if st.button(display_text, key=f"nav_{page_name}", use_container_width=True):
-                    st.session_state['current_page'] = page_name
-                    st.rerun()
+            if plan_name == 'basic':
+                # Basic plan users see locked features
+                if st.button(f"{button_text} 🔒", disabled=True, use_container_width=True, key=f"nav_{page_name}"):
+                    pass
+                # Show tooltip
+                st.caption(f"⬆️ Upgrade to Professional")
             else:
-                # Disabled button with upgrade prompt
-                if plan_name == 'basic':
-                    st.button(f"{button_text} 🔒 Pro+", disabled=True, use_container_width=True)
+                # Professional and Enterprise users
+                if can_use:
+                    # Show usage status for Professional plan
+                    if plan_name == 'professional' and status != 'unlimited':
+                        display_text = f"{button_text} ({status})"
+                    else:
+                        display_text = button_text
+                    
+                    if st.button(display_text, key=f"nav_{page_name}", use_container_width=True):
+                        st.session_state['current_page'] = page_name
+                        st.rerun()
                 else:
-                    st.button(f"{button_text} ({status})", disabled=True, use_container_width=True)
+                    # Professional plan - limit reached
+                    if st.button(f"{button_text} 🔒", disabled=True, use_container_width=True, key=f"nav_{page_name}"):
+                        pass
+                    st.caption(f"{status}")
         
         # ========== ENTERPRISE FEATURES ==========
         if plan_name == 'enterprise':
@@ -327,6 +345,11 @@ class EnhancedAuthService:
                 if st.button(button_text, key=f"nav_{page_name}", use_container_width=True):
                     st.session_state['current_page'] = page_name
                     st.rerun()
+        elif plan_name in ['basic', 'professional']:
+            # Show locked enterprise features
+            st.markdown("---")
+            st.markdown("**Enterprise Features 🔒**")
+            st.caption("Available in Enterprise plan")
     
     def show_user_settings(self):
         """Show user settings modal"""
