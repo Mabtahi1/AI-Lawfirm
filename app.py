@@ -477,6 +477,29 @@ page_modules = {
 
 def main():
     """Main application function"""
+    
+    try:
+        # Handle email verification and password reset
+        handle_email_verification()
+        handle_password_reset()
+        
+        # Initialize session state and load data
+        initialize_session_state()
+        load_sample_data()
+        
+        # Initialize authentication service
+        auth_service = AuthService()
+        
+        # Check authentication
+        if not auth_service.is_logged_in():
+            auth_service.show_login()
+            return
+        
+        # Check if email is verified
+        user_data = st.session_state.get('user_data', {})
+        if not user_data.get('email_verified', False):
+            show_email_verification_warning()
+            return
     try:
         # Initialize session state and load data
         initialize_session_state()
@@ -703,6 +726,114 @@ def handle_error(error, context="Application"):
         
     if st.button("🔄 Reload Application"):
         st.rerun()
+
+def handle_email_verification():
+    """Handle email verification from URL"""
+    
+    # Check for verification token in URL
+    query_params = st.query_params
+    
+    if 'verify' in query_params:
+        token = query_params['verify']
+        
+        email, error = AuthTokenManager.verify_token(token, 'verification')
+        
+        if error:
+            st.error(f"❌ Verification failed: {error}")
+            return
+        
+        # Mark email as verified
+        if 'users' in st.session_state and email in st.session_state.users:
+            st.session_state.users[email]['data']['email_verified'] = True
+            # Send welcome email
+            user_data = st.session_state.users[email]['data']
+            org_code = user_data['organization_code']
+            subscription = st.session_state.subscriptions.get(org_code, {})
+            plan_name = SUBSCRIPTION_PLANS[subscription.get('plan', 'basic')]['name']
+            
+            email_service = EmailService()
+            email_service.send_welcome_email(email, user_data['first_name'], plan_name)
+            
+            # Remove token
+            if 'verification_tokens' in st.session_state:
+                st.session_state.verification_tokens.pop(token, None)
+            
+            st.success(f"✅ Email verified successfully! Welcome to LegalDoc Pro, {user_data['first_name']}!")
+            st.balloons()
+            
+            # Auto-login
+            st.session_state.logged_in = True
+            st.session_state.user_data = user_data
+            st.session_state.current_page = 'Executive Dashboard'
+            
+            # Clear query params
+            st.query_params.clear()
+            
+            import time
+            time.sleep(2)
+            st.rerun()
+        else:
+            st.error("❌ User not found")
+
+def handle_password_reset():
+    """Handle password reset from URL"""
+    
+    query_params = st.query_params
+    
+    if 'reset' in query_params:
+        token = query_params['reset']
+        
+        email, error = AuthTokenManager.verify_token(token, 'reset')
+        
+        if error:
+            st.error(f"❌ Reset link invalid: {error}")
+            return
+        
+        # Show password reset form
+        st.markdown("""
+        <div class="main-header">
+            <h1>🔐 Reset Your Password</h1>
+            <p>Enter your new password below</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            with st.form("reset_password_form"):
+                st.write(f"**Email:** {email}")
+                
+                new_password = st.text_input("New Password", type="password", placeholder="Minimum 8 characters")
+                confirm_password = st.text_input("Confirm New Password", type="password")
+                
+                submitted = st.form_submit_button("Reset Password", use_container_width=True, type="primary")
+                
+                if submitted:
+                    if len(new_password) < 8:
+                        st.error("Password must be at least 8 characters")
+                    elif new_password != confirm_password:
+                        st.error("Passwords do not match")
+                    else:
+                        # Update password
+                        hashed_password = AuthTokenManager.hash_password(new_password)
+                        
+                        if 'users' in st.session_state and email in st.session_state.users:
+                            st.session_state.users[email]['password'] = hashed_password
+                            
+                            # Remove token
+                            if 'reset_tokens' in st.session_state:
+                                st.session_state.reset_tokens.pop(token, None)
+                            
+                            st.success("✅ Password reset successfully! You can now log in.")
+                            
+                            # Clear query params
+                            st.query_params.clear()
+                            
+                            import time
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("User not found")
 
 # Add system status to sidebar
 if __name__ == "__main__":
