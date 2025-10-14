@@ -835,6 +835,74 @@ def handle_password_reset():
                         else:
                             st.error("User not found")
 
+def show_email_verification_warning():
+    """Show warning when email is not verified"""
+    
+    user_data = st.session_state.get('user_data', {})
+    email = user_data.get('email')
+    
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+        color: white;
+        padding: 3rem;
+        border-radius: 20px;
+        text-align: center;
+        margin: 2rem;
+    ">
+        <h1>📧 Verify Your Email</h1>
+        <p style="font-size: 1.2rem;">
+            Please verify your email address to access your account
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.info(f"""
+        We sent a verification email to **{email}**.
+        
+        Please check your inbox and click the verification link.
+        """)
+        
+        st.markdown("### Didn't receive the email?")
+        
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("📨 Resend Verification Email", use_container_width=True, type="primary"):
+                email_service = EmailService()
+                verification_token = AuthTokenManager.create_verification_token(email)
+                email_sent = email_service.send_verification_email(email, verification_token)
+                
+                if email_sent:
+                    st.success("✅ Verification email sent!")
+                else:
+                    st.error("Failed to send email. Please try again.")
+        
+        with col_btn2:
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state.logged_in = False
+                st.session_state.user_data = None
+                st.rerun()
+        
+        st.markdown("---")
+        
+        with st.expander("💡 Troubleshooting"):
+            st.write("""
+            **Email not arriving?**
+            
+            1. Check your spam/junk folder
+            2. Make sure you entered the correct email
+            3. Wait a few minutes for delivery
+            4. Contact support: support@legaldocpro.com
+            
+            **In development mode?**
+            The verification link is displayed in the console instead of being emailed.
+            """)
+
+
 # Add system status to sidebar
 if __name__ == "__main__":
     try:
