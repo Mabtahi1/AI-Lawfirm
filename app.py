@@ -455,6 +455,7 @@ def show_basic_dashboard():
 
 # Try to import pages, with fallbacks
 page_modules = {
+    "Signup": safe_import_page("signup", "pages.signup"),
     "Executive Dashboard": safe_import_page("dashboard", "pages.dashboard"),
     "Document Management": safe_import_page("documents", "pages.documents"), 
     "Matter Management": safe_import_page("matters", "pages.matters"),
