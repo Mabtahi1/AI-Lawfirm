@@ -191,7 +191,6 @@ class EnhancedAuthService:
     
     def show_login(self):
         """Show login page"""
-    
         st.markdown("""
         <div class="main-header">
             <h1>⚖️ LegalDoc Pro</h1>
@@ -236,7 +235,7 @@ class EnhancedAuthService:
                             user_data = users[email]['data']
                             
                             # Check if email verified
-                            if not user_data.get('email_verified', False):
+                            if not user_data.get('email_verified', True):  # Default True for demo users
                                 st.warning("⚠️ Please verify your email before logging in.")
                                 
                                 if st.button("📨 Resend Verification Email"):
@@ -288,7 +287,6 @@ class EnhancedAuthService:
             from pages.signup import show as show_signup
             show_signup()
     
-    
     def render_sidebar(self):
         """Render sidebar with subscription info"""
         user_data = st.session_state.get('user_data', {})
@@ -312,7 +310,7 @@ class EnhancedAuthService:
             # Management options for subscription owners
             if user_data.get('is_subscription_owner'):
                 if st.button("💳 Billing & Subscription"):
-                    st.session_state['current_page'] = 'Billing Management'  # CHANGED THIS
+                    st.session_state['current_page'] = 'Billing Management'
                     st.rerun()
             
             if st.button("🚪 Logout"):
@@ -375,10 +373,12 @@ class EnhancedAuthService:
             
             if plan_name == 'basic':
                 # Basic plan users see locked features
-                if st.button(f"{button_text} 🔒", disabled=True, use_container_width=True, key=f"nav_{page_name}"):
-                    pass
-                # Show tooltip
-                st.caption(f"⬆️ Upgrade to Professional")
+                if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
+                    # Trigger upgrade modal
+                    from components.upgrade_modal import trigger_upgrade_modal
+                    trigger_upgrade_modal(feature_name, button_text.replace('🔒', '').strip())
+                    st.rerun()
+                st.caption("⬆️ Upgrade to unlock")
             else:
                 # Professional and Enterprise users
                 if can_use:
@@ -393,8 +393,10 @@ class EnhancedAuthService:
                         st.rerun()
                 else:
                     # Professional plan - limit reached
-                    if st.button(f"{button_text} 🔒", disabled=True, use_container_width=True, key=f"nav_{page_name}"):
-                        pass
+                    if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
+                        from components.upgrade_modal import trigger_upgrade_modal
+                        trigger_upgrade_modal(feature_name, button_text)
+                        st.rerun()
                     st.caption(f"{status}")
         
         # ========== ENTERPRISE FEATURES ==========
@@ -417,53 +419,7 @@ class EnhancedAuthService:
             st.markdown("---")
             st.markdown("**Enterprise Features 🔒**")
             st.caption("Available in Enterprise plan")
-
-        # ========== AI FEATURES ==========
-    st.markdown("---")
-    st.markdown("**AI-Powered Features**")
     
-    ai_features = [
-        ("🤖 AI Insights", "AI Insights", "ai_insights"),
-        ("🔍 Case Comparison", "Case Comparison", "case_comparison"),
-        ("🔎 Advanced Search", "Advanced Search", "advanced_search"),
-        ("📊 Business Intel", "Business Intelligence", "business_intelligence")
-    ]
-    
-    for button_text, page_name, feature_name in ai_features:
-        can_use, status = self.subscription_manager.can_use_feature_with_limit(org_code, feature_name)
-        
-        if plan_name == 'basic':
-            # Basic plan - show upgrade prompt on click
-            if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
-                trigger_upgrade_modal(feature_name, button_text.replace('🔒', '').strip())
-                st.rerun()
-            st.caption("⬆️ Upgrade to unlock")
-        else:
-            # Professional/Enterprise plans
-            if can_use:
-                if plan_name == 'professional' and status != 'unlimited':
-                    display_text = f"{button_text} ({status})"
-                else:
-                    display_text = button_text
-                
-                if st.button(display_text, key=f"nav_{page_name}", use_container_width=True):
-                    st.session_state['current_page'] = page_name
-                    st.rerun()
-            else:
-                # Limit reached - show upgrade to Enterprise
-                if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
-                    trigger_upgrade_modal(feature_name, button_text)
-                    st.rerun()
-                st.caption(f"{status}")
-    
-    # Check if we should show upgrade modal
-    if 'show_upgrade_modal' in st.session_state:
-        modal_data = st.session_state['show_upgrade_modal']
-        show_upgrade_modal(
-            plan_name,
-            modal_data['feature_name'],
-            modal_data['feature_display_name']
-        )
     def show_user_settings(self):
         """Show user settings modal"""
         pass
