@@ -2,6 +2,16 @@ import streamlit as st
 import sys
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Import auth token manager for password reset and verification
+from services.email_service import AuthTokenManager, EmailService
+from services.subscription_config import SUBSCRIPTION_PLANS
+from services.email_scheduler import EmailScheduler
+
 
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -455,10 +465,12 @@ def show_basic_dashboard():
 
 # Try to import pages, with fallbacks
 page_modules = {
+    "Signup": safe_import_page("signup", "pages.signup"),
     "Executive Dashboard": safe_import_page("dashboard", "pages.dashboard"),
     "Document Management": safe_import_page("documents", "pages.documents"), 
     "Matter Management": safe_import_page("matters", "pages.matters"),
-    "Time & Billing": safe_import_page("billing", "pages.time_billing"),
+    "Case Comparison": safe_import_page("case_comparison", "pages.case_comparison"),
+    "Time & Billing": safe_import_page("time_billing", "pages.time_billing"),
     "AI Insights": safe_import_page("ai_insights", "pages.ai_insights"),
     "Calendar & Tasks": safe_import_page("calendar_tasks", "pages.calendar_tasks"),
     "Advanced Search": safe_import_page("advanced_search", "pages.advanced_search"),
@@ -469,13 +481,314 @@ page_modules = {
     "System Settings": safe_import_page("settings", "pages.system_settings"),
     "Client Dashboard": safe_import_page("client_dashboard", "pages.client_dashboard"),
     "My Documents": safe_import_page("my_documents", "pages.my_documents"),
-    "Billing": safe_import_page("billing_view", "pages.billing_view"),
+    "Billing Management": safe_import_page("billing_management", "pages.billing_management"),
     "Messages": safe_import_page("messages", "pages.messages")
 }
 
+
+
+def handle_email_verification():
+    """Handle email verification from URL"""
+    
+    query_params = st.query_params
+    
+    if 'verify' in query_params:
+        token = query_params['verify']
+        
+        email, error = AuthTokenManager.verify_token(token, 'verification')
+        
+        if error:
+            st.error(f"❌ Verification failed: {error}")
+            
+            if st.button("🏠 Go to Login"):
+                st.query_params.clear()
+                st.rerun()
+            return False
+        
+        # Mark email as verified
+        if 'users' in st.session_state and email in st.session_state.users:
+            st.session_state.users[email]['data']['email_verified'] = True
+            
+            # Send welcome email
+            user_data = st.session_state.users[email]['data']
+            org_code = user_data['organization_code']
+            subscription = st.session_state.subscriptions.get(org_code, {})
+            plan_name = SUBSCRIPTION_PLANS[subscription.get('plan', 'basic')]['name']
+            
+            email_service = EmailService()
+            email_service.send_welcome_email(email, user_data['first_name'], plan_name)
+            
+            # Remove token
+            if 'verification_tokens' in st.session_state:
+                st.session_state.verification_tokens.pop(token, None)
+            
+            st.success(f"✅ Email verified successfully! Welcome to LegalDoc Pro, {user_data['first_name']}!")
+            st.balloons()
+            
+            # Auto-login
+            st.session_state.logged_in = True
+            st.session_state.user_data = user_data
+            st.session_state.current_page = 'Executive Dashboard'
+            
+            # Clear query params
+            st.query_params.clear()
+            
+            import time
+            time.sleep(2)
+            st.rerun()
+            
+            return True
+        else:
+            st.error("❌ User not found")
+            return False
+    
+    return None
+
+def handle_password_reset():
+    """Handle password reset from URL"""
+    
+    query_params = st.query_params
+    
+    if 'reset' in query_params:
+        token = query_params['reset']
+        
+        email, error = AuthTokenManager.verify_token(token, 'reset')
+        
+        if error:
+            st.error(f"❌ Reset link invalid: {error}")
+            st.write("The link may have expired or been used already.")
+            
+            if st.button("🔐 Request New Reset Link"):
+                st.query_params.clear()
+                st.query_params.update({"page": "forgot_password"})
+                st.rerun()
+            
+            if st.button("🏠 Go to Login"):
+                st.query_params.clear()
+                st.rerun()
+            return False
+        
+        # Show password reset form
+        st.markdown("""
+        <div class="main-header">
+            <h1>🔐 Reset Your Password</h1>
+            <p>Enter your new password below</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            with st.form("reset_password_form"):
+                st.write(f"**Email:** {email}")
+                
+                new_password = st.text_input("New Password", type="password", placeholder="Minimum 8 characters")
+                
+                # Password strength indicator
+                if new_password:
+                    strength = calculate_password_strength(new_password)
+                    strength_colors = {
+                        'weak': '#dc3545',
+                        'medium': '#ffc107',
+                        'strong': '#28a745'
+                    }
+                    st.markdown(f"""
+                    <div style="
+                        background: {strength_colors[strength]};
+                        color: white;
+                        padding: 0.5rem;
+                        border-radius: 5px;
+                        text-align: center;
+                        margin: 0.5rem 0;
+                    ">
+                        Password Strength: {strength.upper()}
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                confirm_password = st.text_input("Confirm New Password", type="password")
+                
+                st.markdown("**Password Requirements:**")
+                st.write("• At least 8 characters")
+                st.write("• Mix of uppercase and lowercase letters")
+                st.write("• At least one number")
+                st.write("• At least one special character")
+                
+                submitted = st.form_submit_button("Reset Password", use_container_width=True, type="primary")
+                
+                if submitted:
+                    errors = []
+                    
+                    if len(new_password) < 8:
+                        errors.append("Password must be at least 8 characters")
+                    
+                    if not any(c.isupper() for c in new_password):
+                        errors.append("Password must contain at least one uppercase letter")
+                    
+                    if not any(c.islower() for c in new_password):
+                        errors.append("Password must contain at least one lowercase letter")
+                    
+                    if not any(c.isdigit() for c in new_password):
+                        errors.append("Password must contain at least one number")
+                    
+                    if new_password != confirm_password:
+                        errors.append("Passwords do not match")
+                    
+                    if errors:
+                        for error in errors:
+                            st.error(error)
+                    else:
+                        # Update password
+                        hashed_password = AuthTokenManager.hash_password(new_password)
+                        
+                        if 'users' in st.session_state and email in st.session_state.users:
+                            st.session_state.users[email]['password'] = hashed_password
+                            
+                            # Remove token
+                            if 'reset_tokens' in st.session_state:
+                                st.session_state.reset_tokens.pop(token, None)
+                            
+                            st.success("✅ Password reset successfully! You can now log in with your new password.")
+                            st.balloons()
+                            
+                            # Clear query params
+                            st.query_params.clear()
+                            
+                            import time
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("User not found")
+        
+        return True
+    
+    return None
+
+def calculate_password_strength(password):
+    """Calculate password strength"""
+    score = 0
+    
+    if len(password) >= 8:
+        score += 1
+    if len(password) >= 12:
+        score += 1
+    if any(c.isupper() for c in password):
+        score += 1
+    if any(c.islower() for c in password):
+        score += 1
+    if any(c.isdigit() for c in password):
+        score += 1
+    if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in password):
+        score += 1
+    
+    if score <= 2:
+        return 'weak'
+    elif score <= 4:
+        return 'medium'
+    else:
+        return 'strong'
+
+def show_email_verification_warning():
+    """Show warning when email is not verified"""
+    
+    user_data = st.session_state.get('user_data', {})
+    email = user_data.get('email')
+    
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+        color: white;
+        padding: 3rem;
+        border-radius: 20px;
+        text-align: center;
+        margin: 2rem;
+    ">
+        <h1>📧 Verify Your Email</h1>
+        <p style="font-size: 1.2rem;">
+            Please verify your email address to access your account
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.info(f"""
+        We sent a verification email to **{email}**.
+        
+        Please check your inbox and click the verification link.
+        """)
+        
+        st.markdown("### Didn't receive the email?")
+        
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("📨 Resend Verification Email", use_container_width=True, type="primary"):
+                email_service = EmailService()
+                verification_token = AuthTokenManager.create_verification_token(email)
+                email_sent = email_service.send_verification_email(email, verification_token)
+                
+                if email_sent:
+                    st.success("✅ Verification email sent! Check your inbox.")
+                else:
+                    st.warning("📧 In development mode, check the console for the verification link.")
+        
+        with col_btn2:
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state.logged_in = False
+                st.session_state.user_data = None
+                st.rerun()
+        
+        st.markdown("---")
+        
+        with st.expander("💡 Troubleshooting"):
+            st.write("""
+            **Email not arriving?**
+            
+            1. ✉️ Check your spam/junk folder
+            2. ✅ Make sure you entered the correct email
+            3. ⏰ Wait a few minutes for delivery
+            4. 📞 Contact support: support@legaldocpro.com
+            
+            **In development mode?**
+            
+            If `SENDGRID_API_KEY` is not set in your `.env` file, the verification link 
+            will be displayed in the application instead of being emailed.
+            """)
+
+def handle_forgot_password():
+    """Handle forgot password page"""
+    
+    query_params = st.query_params
+    
+    if query_params.get('page') == 'forgot_password':
+        from pages.forgot_password import show
+        show()
+        return True
+    
+    return False
+
 def main():
     """Main application function"""
+    
     try:
+        # Run scheduled email tasks (for trial reminders, etc.)
+        email_scheduler = EmailScheduler()
+        email_scheduler.run_scheduled_tasks()
+        
+        # Handle email verification and password reset FIRST (before anything else)
+        verification_result = handle_email_verification()
+        if verification_result is not None:
+            return  # Stop here if we're handling verification
+        
+        reset_result = handle_password_reset()
+        if reset_result is not None:
+            return  # Stop here if we're handling password reset
+        
+        forgot_result = handle_forgot_password()
+        if forgot_result:
+            return  # Stop here if showing forgot password page
+        
         # Initialize session state and load data
         initialize_session_state()
         load_sample_data()
@@ -486,6 +799,12 @@ def main():
         # Check authentication
         if not auth_service.is_logged_in():
             auth_service.show_login()
+            return
+        
+        # Check if email is verified
+        user_data = st.session_state.get('user_data', {})
+        if not user_data.get('email_verified', False):
+            show_email_verification_warning()
             return
         
         # Add styling for logged-in pages
@@ -613,6 +932,21 @@ def main():
         if st.session_state.get('show_user_settings', False):
             auth_service.show_user_settings()
         
+        # Check if we should show upgrade modal
+        if 'show_upgrade_modal' in st.session_state:
+            from components.upgrade_modal import show_upgrade_modal
+            
+            modal_data = st.session_state['show_upgrade_modal']
+            user_data = st.session_state.get('user_data', {})
+            org_code = user_data.get('organization_code')
+            subscription = st.session_state.subscriptions.get(org_code, {})
+            
+            show_upgrade_modal(
+                subscription.get('plan', 'basic'),
+                modal_data['feature_name'],
+                modal_data['feature_display_name']
+            )
+        
         # Route to appropriate page
         if current_page in page_modules:
             try:
@@ -701,6 +1035,182 @@ def handle_error(error, context="Application"):
         
     if st.button("🔄 Reload Application"):
         st.rerun()
+
+def handle_email_verification():
+    """Handle email verification from URL"""
+    
+    # Check for verification token in URL
+    query_params = st.query_params
+    
+    if 'verify' in query_params:
+        token = query_params['verify']
+        
+        email, error = AuthTokenManager.verify_token(token, 'verification')
+        
+        if error:
+            st.error(f"❌ Verification failed: {error}")
+            return
+        
+        # Mark email as verified
+        if 'users' in st.session_state and email in st.session_state.users:
+            st.session_state.users[email]['data']['email_verified'] = True
+            # Send welcome email
+            user_data = st.session_state.users[email]['data']
+            org_code = user_data['organization_code']
+            subscription = st.session_state.subscriptions.get(org_code, {})
+            plan_name = SUBSCRIPTION_PLANS[subscription.get('plan', 'basic')]['name']
+            
+            email_service = EmailService()
+            email_service.send_welcome_email(email, user_data['first_name'], plan_name)
+            
+            # Remove token
+            if 'verification_tokens' in st.session_state:
+                st.session_state.verification_tokens.pop(token, None)
+            
+            st.success(f"✅ Email verified successfully! Welcome to LegalDoc Pro, {user_data['first_name']}!")
+            st.balloons()
+            
+            # Auto-login
+            st.session_state.logged_in = True
+            st.session_state.user_data = user_data
+            st.session_state.current_page = 'Executive Dashboard'
+            
+            # Clear query params
+            st.query_params.clear()
+            
+            import time
+            time.sleep(2)
+            st.rerun()
+        else:
+            st.error("❌ User not found")
+
+def handle_password_reset():
+    """Handle password reset from URL"""
+    
+    query_params = st.query_params
+    
+    if 'reset' in query_params:
+        token = query_params['reset']
+        
+        email, error = AuthTokenManager.verify_token(token, 'reset')
+        
+        if error:
+            st.error(f"❌ Reset link invalid: {error}")
+            return
+        
+        # Show password reset form
+        st.markdown("""
+        <div class="main-header">
+            <h1>🔐 Reset Your Password</h1>
+            <p>Enter your new password below</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            with st.form("reset_password_form"):
+                st.write(f"**Email:** {email}")
+                
+                new_password = st.text_input("New Password", type="password", placeholder="Minimum 8 characters")
+                confirm_password = st.text_input("Confirm New Password", type="password")
+                
+                submitted = st.form_submit_button("Reset Password", use_container_width=True, type="primary")
+                
+                if submitted:
+                    if len(new_password) < 8:
+                        st.error("Password must be at least 8 characters")
+                    elif new_password != confirm_password:
+                        st.error("Passwords do not match")
+                    else:
+                        # Update password
+                        hashed_password = AuthTokenManager.hash_password(new_password)
+                        
+                        if 'users' in st.session_state and email in st.session_state.users:
+                            st.session_state.users[email]['password'] = hashed_password
+                            
+                            # Remove token
+                            if 'reset_tokens' in st.session_state:
+                                st.session_state.reset_tokens.pop(token, None)
+                            
+                            st.success("✅ Password reset successfully! You can now log in.")
+                            
+                            # Clear query params
+                            st.query_params.clear()
+                            
+                            import time
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("User not found")
+
+def show_email_verification_warning():
+    """Show warning when email is not verified"""
+    
+    user_data = st.session_state.get('user_data', {})
+    email = user_data.get('email')
+    
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+        color: white;
+        padding: 3rem;
+        border-radius: 20px;
+        text-align: center;
+        margin: 2rem;
+    ">
+        <h1>📧 Verify Your Email</h1>
+        <p style="font-size: 1.2rem;">
+            Please verify your email address to access your account
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.info(f"""
+        We sent a verification email to **{email}**.
+        
+        Please check your inbox and click the verification link.
+        """)
+        
+        st.markdown("### Didn't receive the email?")
+        
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("📨 Resend Verification Email", use_container_width=True, type="primary"):
+                email_service = EmailService()
+                verification_token = AuthTokenManager.create_verification_token(email)
+                email_sent = email_service.send_verification_email(email, verification_token)
+                
+                if email_sent:
+                    st.success("✅ Verification email sent!")
+                else:
+                    st.error("Failed to send email. Please try again.")
+        
+        with col_btn2:
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state.logged_in = False
+                st.session_state.user_data = None
+                st.rerun()
+        
+        st.markdown("---")
+        
+        with st.expander("💡 Troubleshooting"):
+            st.write("""
+            **Email not arriving?**
+            
+            1. Check your spam/junk folder
+            2. Make sure you entered the correct email
+            3. Wait a few minutes for delivery
+            4. Contact support: support@legaldocpro.com
+            
+            **In development mode?**
+            The verification link is displayed in the console instead of being emailed.
+            """)
+
 
 # Add system status to sidebar
 if __name__ == "__main__":
