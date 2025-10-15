@@ -238,7 +238,7 @@ def show_billing_metrics():
     invoices = st.session_state.invoices
     
     # Calculate metrics
-    unbilled_hours = sum(entry['hours'] for entry in time_entries if not entry['billed'])
+    unbilled_hours = sum(entry.get('hours', 0) for entry in time_entries if not entry.get('billed', False))
     unbilled_amount = sum(entry['hours'] * entry['rate'] for entry in time_entries if not entry['billed'])
     
     outstanding_invoices = [inv for inv in invoices if inv['status'] == 'sent']
