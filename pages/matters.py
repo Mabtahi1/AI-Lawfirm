@@ -205,8 +205,8 @@ def show():
     
     # Now use time_entries with dot notation
     total_unbilled_hours = sum(
-        entry.hours for entry in time_entries 
-        if entry.status == "draft" and entry.billable
+        entry.get('hours', 0) for entry in time_entries 
+        if entry.get('status') == "draft" and entry.get('billable', False)
     )
     # Professional header styling
     st.markdown("""
