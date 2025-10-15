@@ -342,3 +342,6 @@ def show_similarity_matrix(comparison_service, subscription_manager, org_code):
     - Cluster analysis
     - Pattern identification
     """)
+
+if __name__ == "__main__":
+    show()    
