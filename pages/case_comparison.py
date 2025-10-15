@@ -1,16 +1,3 @@
-# TEMPORARY DEBUG - Add at the very top
-try:
-    from services.case_comparison import CaseComparisonService
-    st.write("✅ CaseComparisonService imported successfully")
-except Exception as e:
-    st.error(f"❌ Failed to import CaseComparisonService: {e}")
-
-try:
-    from services.subscription_manager import SubscriptionManager
-    st.write("✅ SubscriptionManager imported successfully")
-except Exception as e:
-    st.error(f"❌ Failed to import SubscriptionManager: {e}")
-
 import streamlit as st
 import pandas as pd
 from services.case_comparison import CaseComparisonService
