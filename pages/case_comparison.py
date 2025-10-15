@@ -577,3 +577,5 @@ def show_similarity_matrix():
     # Mock visualization
     st.image("https://via.placeholder.com/800x400/1e3a8a/ffffff?text=Similarity+Matrix+Visualization+Coming+Soon", 
              use_container_width=True)
+if __name__ == "__main__":
+    show()
