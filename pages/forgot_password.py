@@ -59,3 +59,6 @@ def show():
         if st.button("← Back to Login"):
             st.query_params.clear()
             st.rerun()
+
+if __name__ == "__main__":
+    show()
