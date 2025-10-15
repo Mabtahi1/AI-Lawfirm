@@ -235,84 +235,72 @@ class EnhancedAuthService:
         </div>
         """, unsafe_allow_html=True)
         
-        # Tabs for login and signup
-        tab1, tab2 = st.tabs(["🔐 Login", "✨ Sign Up"])
+        col1, col2, col3 = st.columns([1, 2, 1])
         
-        with tab1:
-            col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("### Login to Your Account")
             
-            with col2:
-                st.markdown("### Login to Your Account")
+            # Show demo accounts info
+            with st.expander("📝 Demo Accounts", expanded=False):
+                st.info("""
+                **Basic Plan:** basic@demo.com / demo123
+                **Professional Plan:** pro@demo.com / demo123  
+                **Enterprise Plan:** enterprise@demo.com / demo123
+                """)
+            
+            email = st.text_input("Email", placeholder="your@email.com")
+            password = st.text_input("Password", type="password")
+            
+            remember_me = st.checkbox("Remember me")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if st.button("Login", use_container_width=True, type="primary"):
+                # Check if user exists
+                users = st.session_state.get('users', {})
                 
-                # Show demo accounts info
-                with st.expander("📝 Demo Accounts", expanded=False):
-                    st.info("""
-                    **Basic Plan:** basic@demo.com / demo123
-                    **Professional Plan:** pro@demo.com / demo123  
-                    **Enterprise Plan:** enterprise@demo.com / demo123
-                    """)
-                
-                email = st.text_input("Email", placeholder="your@email.com")
-                password = st.text_input("Password", type="password")
-                
-                remember_me = st.checkbox("Remember me")
-                
-                st.markdown("<br>", unsafe_allow_html=True)
-                
-                if st.button("Login", use_container_width=True, type="primary"):
-                    # Check if user exists
-                    users = st.session_state.get('users', {})
+                if email in users:
+                    # Verify password
+                    stored_password = users[email]['password']
                     
-                    if email in users:
-                        # Verify password
-                        stored_password = users[email]['password']
+                    if AuthTokenManager.verify_password(password, stored_password):
+                        # Valid login
+                        user_data = users[email]['data']
                         
-                        if AuthTokenManager.verify_password(password, stored_password):
-                            # Valid login
-                            user_data = users[email]['data']
-                            
-                            org_code = user_data.get('organization_code')
-                            
-                            if not org_code:
-                                st.error("⚠️ User account missing organization code. Please contact support.")
-                                return
-                            
-                            # Get their subscription
-                            subscription = st.session_state.subscriptions.get(org_code, {})
-                            
-                            # Check if trial expired
-                            if subscription.get('status') == 'trial':
-                                trial_end_str = subscription.get('trial_end_date')
-                                if trial_end_str:
-                                    from datetime import datetime
-                                    trial_end = datetime.fromisoformat(trial_end_str)
-                                    if datetime.now() > trial_end:
-                                        st.error("⚠️ Your trial has expired. Please update your payment information to continue.")
-                                        return
-                            
-                            # Log them in
-                            st.session_state.logged_in = True
-                            st.session_state.user_data = user_data
-                            st.session_state.current_page = 'Executive Dashboard'
-                            
-                            plan = subscription.get('plan', 'basic')
-                            st.success(f"Welcome back, {user_data.get('first_name', user_data['name'])}! ({plan.title()} Plan)")
-                            st.rerun()
-                        else:
-                            st.error("❌ Invalid email or password")
+                        org_code = user_data.get('organization_code')
+                        
+                        if not org_code:
+                            st.error("⚠️ User account missing organization code. Please contact support.")
+                            return
+                        
+                        # Get their subscription
+                        subscription = st.session_state.subscriptions.get(org_code, {})
+                        
+                        # Check if trial expired
+                        if subscription.get('status') == 'trial':
+                            trial_end_str = subscription.get('trial_end_date')
+                            if trial_end_str:
+                                from datetime import datetime
+                                trial_end = datetime.fromisoformat(trial_end_str)
+                                if datetime.now() > trial_end:
+                                    st.error("⚠️ Your trial has expired. Please update your payment information to continue.")
+                                    return
+                        
+                        # Log them in
+                        st.session_state.logged_in = True
+                        st.session_state.user_data = user_data
+                        st.session_state.current_page = 'Executive Dashboard'
+                        
+                        plan = subscription.get('plan', 'basic')
+                        st.success(f"Welcome back, {user_data.get('first_name', user_data['name'])}! ({plan.title()} Plan)")
+                        st.rerun()
                     else:
                         st.error("❌ Invalid email or password")
-                
-                st.markdown("---")
-                st.caption("Don't have an account? Use the Sign Up tab above")
-        
-        with tab2:
-            # Import and show signup page
-            try:
-                from pages.signup import show as show_signup
-                show_signup()
-            except:
-                st.info("Signup page coming soon. Use demo accounts for now.")
+                else:
+                    st.error("❌ Invalid email or password")
+            
+            st.markdown("---")
+            st.caption("Contact your administrator for access")
     
     def render_sidebar(self):
         """Render sidebar with subscription info"""
