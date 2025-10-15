@@ -427,3 +427,5 @@ def create_account(first_name, last_name, email, phone, org_name, org_size, prac
     import time
     time.sleep(2)
     st.rerun()
+if __name__ == "__main__":
+    show()
