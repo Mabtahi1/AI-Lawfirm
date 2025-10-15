@@ -1176,3 +1176,5 @@ def load_sample_invoices():
     ]
     
     return sample_invoices
+if __name__ == "__main__":
+    show()
