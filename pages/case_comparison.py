@@ -3,7 +3,9 @@ import pandas as pd
 
 def show():
     """Display the case comparison page"""
-    
+    # FIRST LINE - Test if function is called at all
+    st.write("🧪 DEBUG: show() function was called!")
+    st.write("🧪 Session state keys:", list(st.session_state.keys()))
     # Try to import services with error handling
     try:
         from services.case_comparison import CaseComparisonService
