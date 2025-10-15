@@ -74,6 +74,11 @@ class SubscriptionManager:
     def get_plan_details(self, plan_name):
         """Get details for a specific plan"""
         return SUBSCRIPTION_PLANS.get(plan_name, SUBSCRIPTION_PLANS['basic'])
+
+    def get_plan_limits(self, plan_name):
+        """Get all limits for a specific plan"""
+        plan_details = self.get_plan_details(plan_name)
+        return plan_details.get('limits', {})
     
     def can_use_feature(self, org_code, feature_name):
         """Check if organization can use a specific feature"""
