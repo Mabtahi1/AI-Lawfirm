@@ -1,21 +1,53 @@
 import streamlit as st
 import pandas as pd
-from services.case_comparison import CaseComparisonService
-from services.subscription_manager import SubscriptionManager
 
 def show():
     """Display the case comparison page"""
     
+    # Try to import services with error handling
+    try:
+        from services.case_comparison import CaseComparisonService
+        from services.subscription_manager import SubscriptionManager
+    except ImportError as e:
+        st.error(f"❌ Missing required services: {e}")
+        st.info("Please ensure the following files exist:")
+        st.code("""
+services/
+├── case_comparison.py (with CaseComparisonService class)
+└── subscription_manager.py (with SubscriptionManager class)
+        """)
+        
+        if st.button("🏠 Return to Dashboard"):
+            st.session_state['current_page'] = 'Executive Dashboard'
+            st.rerun()
+        return
+    except Exception as e:
+        st.error(f"❌ Error loading services: {e}")
+        return
+    
     # Initialize services
-    comparison_service = CaseComparisonService()
-    subscription_manager = SubscriptionManager()
+    try:
+        comparison_service = CaseComparisonService()
+        subscription_manager = SubscriptionManager()
+    except Exception as e:
+        st.error(f"❌ Error initializing services: {e}")
+        return
     
     # Get user's organization
     user_data = st.session_state.get('user_data', {})
     org_code = user_data.get('organization_code')
     
+    if not org_code:
+        st.error("⚠️ No organization code found. Please log in again.")
+        return
+    
     # Check if user can access this feature
-    can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'case_comparison')
+    try:
+        can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'case_comparison')
+    except Exception as e:
+        st.error(f"❌ Error checking subscription: {e}")
+        can_use = False
+        status = "Error"
     
     st.markdown("""
     <div class="main-header">
@@ -25,8 +57,12 @@ def show():
     """, unsafe_allow_html=True)
     
     # Show usage status
-    subscription = subscription_manager.get_organization_subscription(org_code)
-    plan_name = subscription.get('plan', 'basic')
+    try:
+        subscription = subscription_manager.get_organization_subscription(org_code)
+        plan_name = subscription.get('plan', 'basic')
+    except:
+        plan_name = 'basic'
+        subscription = {'plan': 'basic'}
     
     col_status1, col_status2, col_status3 = st.columns(3)
     
@@ -35,9 +71,12 @@ def show():
     
     with col_status2:
         if plan_name == 'professional':
-            usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
-            limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
-            st.metric("Usage This Month", f"{usage}/{limit}")
+            try:
+                usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
+                limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
+                st.metric("Usage This Month", f"{usage}/{limit}")
+            except:
+                st.metric("Usage This Month", "0/25")
         elif plan_name == 'enterprise':
             st.metric("Usage", "Unlimited ✨")
         else:
@@ -117,7 +156,7 @@ def show_upgrade_prompt(current_plan, status):
         col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
         with col_btn2:
             if st.button("💳 Upgrade to Professional", type="primary", use_container_width=True):
-                st.session_state['show_billing'] = True
+                st.session_state['current_page'] = 'Billing Management'
                 st.rerun()
     
     else:  # Professional plan, limit reached
@@ -155,7 +194,7 @@ def show_upgrade_prompt(current_plan, status):
             """)
         
         if st.button("🚀 Upgrade to Enterprise for Unlimited Access", type="primary"):
-            st.session_state['show_billing'] = True
+            st.session_state['current_page'] = 'Billing Management'
             st.rerun()
 
 def show_new_case_comparison(comparison_service, subscription_manager, org_code):
@@ -203,6 +242,9 @@ def show_new_case_comparison(comparison_service, subscription_manager, org_code)
         
         if not all_matters:
             st.warning("No previous cases found. Please add some matters first.")
+            if st.button("➕ Go to Matter Management"):
+                st.session_state['current_page'] = 'Matter Management'
+                st.rerun()
             return
         
         # Display available cases
@@ -212,7 +254,7 @@ def show_new_case_comparison(comparison_service, subscription_manager, org_code)
         selected_case_titles = st.multiselect(
             "Select cases to compare",
             options=[m['title'] for m in all_matters],
-            default=[m['title'] for m in all_matters[:5]]  # Select first 5 by default
+            default=[m['title'] for m in all_matters[:min(5, len(all_matters))]]  # Select first 5 by default
         )
         
         # Filter selected cases
@@ -236,7 +278,11 @@ def show_new_case_comparison(comparison_service, subscription_manager, org_code)
                 return
             
             # Check limit one more time before processing
-            can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'case_comparison')
+            try:
+                can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'case_comparison')
+            except:
+                st.error("Error checking subscription status")
+                return
             
             if not can_use:
                 st.error(f"Cannot perform comparison: {status}")
@@ -244,25 +290,32 @@ def show_new_case_comparison(comparison_service, subscription_manager, org_code)
             
             # Show loading
             with st.spinner("🤖 AI is analyzing cases... This may take 30-60 seconds..."):
-                # Perform comparison
-                result = comparison_service.compare_cases(new_case, selected_cases)
-                
-                # Increment usage counter
-                subscription_manager.increment_feature_usage(org_code, 'case_comparison')
+                try:
+                    # Perform comparison
+                    result = comparison_service.compare_cases(new_case, selected_cases)
+                    
+                    # Increment usage counter
+                    subscription_manager.increment_feature_usage(org_code, 'case_comparison')
+                except Exception as e:
+                    st.error(f"❌ Analysis error: {e}")
+                    return
             
-            if result['success']:
+            if result.get('success'):
                 st.success("✅ Analysis complete!")
                 
                 # Show updated usage
-                usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
-                limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
-                
-                if limit != -1:  # Not unlimited
-                    remaining = limit - usage
-                    if remaining > 0:
-                        st.info(f"📊 You have {remaining} comparisons remaining this month")
-                    else:
-                        st.warning("⚠️ You've reached your monthly limit")
+                try:
+                    usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
+                    limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
+                    
+                    if limit != -1:  # Not unlimited
+                        remaining = limit - usage
+                        if remaining > 0:
+                            st.info(f"📊 You have {remaining} comparisons remaining this month")
+                        else:
+                            st.warning("⚠️ You've reached your monthly limit")
+                except:
+                    pass
                 
                 # Display results
                 st.markdown("---")
@@ -270,20 +323,20 @@ def show_new_case_comparison(comparison_service, subscription_manager, org_code)
                 
                 # Full analysis
                 with st.expander("📄 Complete Analysis", expanded=True):
-                    st.markdown(result['analysis'])
+                    st.markdown(result.get('analysis', 'No analysis available'))
                 
                 # Similar cases
                 col_results1, col_results2 = st.columns(2)
                 
                 with col_results1:
                     st.markdown("### 🎯 Most Similar Cases")
-                    if result['similar_cases']:
+                    if result.get('similar_cases'):
                         for case in result['similar_cases']:
                             st.markdown(f"""
                             <div class="document-card">
-                                <h4>{case['title']}</h4>
-                                <p><strong>Type:</strong> {case['type']}</p>
-                                <p><strong>Case ID:</strong> {case['case_id']}</p>
+                                <h4>{case.get('title', 'Untitled')}</h4>
+                                <p><strong>Type:</strong> {case.get('type', 'N/A')}</p>
+                                <p><strong>Case ID:</strong> {case.get('case_id', 'N/A')}</p>
                             </div>
                             """, unsafe_allow_html=True)
                     else:
@@ -291,7 +344,7 @@ def show_new_case_comparison(comparison_service, subscription_manager, org_code)
                 
                 with col_results2:
                     st.markdown("### ⚠️ Key Differences")
-                    if result['key_differences']:
+                    if result.get('key_differences'):
                         for diff in result['key_differences']:
                             st.markdown(f"• {diff}")
                     else:
@@ -299,7 +352,7 @@ def show_new_case_comparison(comparison_service, subscription_manager, org_code)
                 
                 # Recommendations
                 st.markdown("### 💡 Strategic Recommendations")
-                if result['recommendations']:
+                if result.get('recommendations'):
                     for i, rec in enumerate(result['recommendations'], 1):
                         st.markdown(f"{i}. {rec}")
                 else:
@@ -316,7 +369,7 @@ Type: {new_case['type']}
 Client: {new_case['client']}
 
 ANALYSIS:
-{result['analysis']}
+{result.get('analysis', 'No analysis available')}
 """
                 
                 st.download_button(
@@ -331,11 +384,25 @@ ANALYSIS:
 def show_bulk_comparison(comparison_service, subscription_manager, org_code):
     """Show bulk comparison interface"""
     st.subheader("Bulk Case Comparison")
-    st.info("⚠️ Each comparison counts toward your monthly limit")
-    # Rest of the implementation...
+    st.info("⚠️ Feature coming soon - Each comparison will count toward your monthly limit")
+    
+    st.markdown("""
+    ### 📋 Bulk Comparison Features:
+    - Upload multiple cases at once
+    - Compare against entire case database
+    - Generate comprehensive similarity report
+    - Export results to Excel/CSV
+    """)
 
 def show_similarity_matrix(comparison_service, subscription_manager, org_code):
     """Show similarity matrix visualization"""
     st.subheader("Case Similarity Matrix")
-    st.info("⚠️ Each comparison counts toward your monthly limit")
-    # Rest of the implementation...
+    st.info("⚠️ Feature coming soon - Matrix generation will count toward your monthly limit")
+    
+    st.markdown("""
+    ### 📊 Similarity Matrix Features:
+    - Visual representation of case similarities
+    - Interactive heatmap
+    - Cluster analysis
+    - Pattern identification
+    """)
