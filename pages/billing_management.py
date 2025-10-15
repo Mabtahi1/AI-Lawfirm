@@ -484,3 +484,5 @@ def show_usage_history(subscription_manager, org_code):
         file_name=f"usage_report_{datetime.now().strftime('%Y%m%d')}.csv",
         mime="text/csv"
     )
+if __name__ == "__main__":
+    show()    
