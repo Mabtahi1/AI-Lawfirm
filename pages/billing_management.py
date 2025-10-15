@@ -427,3 +427,5 @@ def handle_upgrade(subscription_manager, org_code, new_plan):
                 st.error(f"❌ Upgrade failed: {e}")
         else:
             st.error("❌ Subscription manager not available")
+if __name__ == "__main__":
+    show()            
