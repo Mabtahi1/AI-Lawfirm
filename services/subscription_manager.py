@@ -425,9 +425,7 @@ class EnhancedAuthService:
             st.markdown("**Enterprise Features**")
             
             enterprise_pages = [
-                ("🔗 Integrations", "Integrations"),
-                ("📱 Mobile App", "Mobile App"),
-                ("⚙️ Settings", "System Settings")
+                ("🔗 Integrations", "Integrations")
             ]
             
             for button_text, page_name in enterprise_pages:
