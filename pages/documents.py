@@ -197,7 +197,10 @@ def show():
     </div>
     """, unsafe_allow_html=True)
     
-
+    # Initialize documents in session state if not exists
+    if 'documents' not in st.session_state:
+        st.session_state.documents = []
+        
     # NEW:
     auth_service = EnhancedAuthService()
     
@@ -208,9 +211,7 @@ def show():
     # Now call your function
     show_dashboard_stats(auth_service, org_code)
     
-    # Initialize documents in session state if not exists
-    if 'documents' not in st.session_state:
-        st.session_state.documents = []
+    
     
     # Main tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
