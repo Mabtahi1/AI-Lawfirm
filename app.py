@@ -18,30 +18,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ========== RECURSION PROTECTION ==========
-# Prevent infinite reloads
-if 'reload_count' not in st.session_state:
-    st.session_state.reload_count = 0
-
-st.session_state.reload_count += 1
-
-# If reloaded more than 5 times, stop
-if st.session_state.reload_count > 5:
-    st.error("⚠️ Too many reloads detected. Resetting application...")
-    
-    if st.button("🔄 Reset Application"):
-        # Clear everything
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
-    
-    st.stop()  # Stop execution
-
-# Reset counter after successful load
-if st.session_state.reload_count == 2:
-    st.session_state.reload_count = 0
-
-# Load CSS (keep your existing CSS)
+# Load CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -79,8 +56,21 @@ except ImportError:
 try:
     from session_manager import initialize_session_state, load_sample_data
 except ImportError:
-    st.error("Session manager not found.")
-    st.stop()
+    # If session_manager doesn't exist, create minimal initialization
+    def initialize_session_state():
+        if 'logged_in' not in st.session_state:
+            st.session_state.logged_in = False
+        if 'user_data' not in st.session_state:
+            st.session_state.user_data = None
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = 'Executive Dashboard'
+        if 'documents' not in st.session_state:
+            st.session_state.documents = []
+        if 'matters' not in st.session_state:
+            st.session_state.matters = []
+    
+    def load_sample_data():
+        pass
 
 # Import pages with fallbacks
 def safe_import_page(page_name, module_path):
@@ -93,7 +83,7 @@ def safe_import_page(page_name, module_path):
     except Exception as e:
         return lambda: st.error(f"Error loading {page_name}: {str(e)}")
 
-# Page modules
+# Page modules - ONLY pages that should be accessible after login
 page_modules = {
     "Executive Dashboard": safe_import_page("dashboard", "pages.dashboard"),
     "Document Management": safe_import_page("documents", "pages.documents"), 
@@ -104,7 +94,6 @@ page_modules = {
     "Calendar & Tasks": safe_import_page("calendar_tasks", "pages.calendar_tasks"),
     "Advanced Search": safe_import_page("advanced_search", "pages.advanced_search"),
     "Integrations": safe_import_page("integrations", "pages.integrations"),
-    "Mobile App": safe_import_page("mobile_app", "pages.mobile_app"),
     "Business Intelligence": safe_import_page("business_intel", "pages.business_intelligence"),
     "Billing Management": safe_import_page("billing_management", "pages.billing_management"),
 }
@@ -112,27 +101,7 @@ page_modules = {
 def main():
     """Main application function"""
     
-    # Check URL parameters ONCE at start
-    query_params = st.query_params
-    
-    # Handle special pages that don't need login
-    if 'verify' in query_params:
-        handle_email_verification_static()
-        return
-    
-    if 'reset' in query_params:
-        handle_password_reset_static()
-        return
-    
-    if query_params.get('page') == 'forgot_password':
-        try:
-            from pages.forgot_password import show
-            show()
-        except:
-            st.error("Forgot password page not found")
-        return
-    
-    # Initialize session state ONCE
+    # Initialize session state ONCE at the very beginning
     if 'initialized' not in st.session_state:
         initialize_session_state()
         load_sample_data()
@@ -141,12 +110,41 @@ def main():
     # Initialize authentication service
     auth_service = AuthService()
     
-    # Check authentication
-    if not st.session_state.get('logged_in', False):
-        auth_service.show_login()
+    # Check URL parameters for special pages
+    query_params = st.query_params
+    
+    # Handle email verification (no login required)
+    if 'verify' in query_params:
+        handle_email_verification_static()
         return
     
-    # Main app styling
+    # Handle password reset (no login required)
+    if 'reset' in query_params:
+        handle_password_reset_static()
+        return
+    
+    # ========== AUTHENTICATION GATE ==========
+    # If user is NOT logged in, show ONLY login page (no sidebar, no other pages)
+    if not st.session_state.get('logged_in', False):
+        # Apply login page styling
+        st.markdown("""
+        <style>
+        .stApp {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        [data-testid="stSidebar"] {
+            display: none;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Show ONLY the login page
+        auth_service.show_login()
+        return  # Stop here - don't render anything else
+    
+    # ========== USER IS LOGGED IN - SHOW FULL APP ==========
+    
+    # Apply logged-in app styling
     st.markdown("""
     <style>
     .stApp {
@@ -166,7 +164,7 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
-    # Render sidebar
+    # Render sidebar (only shown when logged in)
     auth_service.render_sidebar()
     
     # Get current page
@@ -178,6 +176,10 @@ def main():
             page_modules[current_page]()
         except Exception as e:
             st.error(f"Error loading {current_page}: {str(e)}")
+            
+            with st.expander("🔧 Error Details"):
+                import traceback
+                st.code(traceback.format_exc())
             
             if st.button("🏠 Return to Dashboard"):
                 st.session_state['current_page'] = 'Executive Dashboard'
@@ -330,14 +332,6 @@ def handle_password_reset_static():
 if __name__ == "__main__":
     try:
         main()
-    except RecursionError:
-        st.error("⚠️ FATAL: Recursion detected")
-        st.write("The app is stuck in a reload loop.")
-        
-        if st.button("🔄 Force Reset"):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
     except Exception as e:
         st.error(f"Application Error: {str(e)}")
         
