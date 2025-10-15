@@ -343,28 +343,38 @@ class EnhancedAuthService:
         ]
         
         for button_text, page_name, feature_name in ai_features:
-            can_use, status = self.subscription_manager.can_use_feature_with_limit(org_code, feature_name)
-            
+            # Always allow navigation to the page - the page itself will handle access control
             if plan_name == 'basic':
-                # Basic plan users see locked features (no modal yet)
-                st.button(f"{button_text} 🔒", key=f"nav_{page_name}", disabled=True, use_container_width=True)
+                # Basic plan users can still navigate to see upgrade prompt
+                if st.button(f"{button_text} 🔒", key=f"nav_{page_name}", use_container_width=True):
+                    st.session_state['current_page'] = page_name
+                    st.rerun()
                 st.caption("⬆️ Upgrade to Professional")
             else:
                 # Professional and Enterprise users
-                if can_use:
+                try:
+                    can_use, status = self.subscription_manager.can_use_feature_with_limit(org_code, feature_name)
+                    
                     # Show usage status for Professional plan
                     if plan_name == 'professional' and status != 'unlimited':
                         display_text = f"{button_text} ({status})"
+                    elif not can_use and plan_name == 'professional':
+                        display_text = f"{button_text} (Limit Reached)"
                     else:
                         display_text = button_text
                     
+                    # Always allow navigation - let the page handle the limit check
                     if st.button(display_text, key=f"nav_{page_name}", use_container_width=True):
                         st.session_state['current_page'] = page_name
                         st.rerun()
-                else:
-                    # Professional plan - limit reached
-                    st.button(f"{button_text} 🔒", key=f"nav_{page_name}", disabled=True, use_container_width=True)
-                    st.caption(f"{status}")
+                    
+                    if not can_use and plan_name == 'professional':
+                        st.caption(f"⚠️ {status}")
+                except Exception as e:
+                    # If subscription check fails, still allow navigation
+                    if st.button(button_text, key=f"nav_{page_name}", use_container_width=True):
+                        st.session_state['current_page'] = page_name
+                        st.rerun()
         
         # ========== ENTERPRISE FEATURES ==========
         if plan_name == 'enterprise':
@@ -386,7 +396,7 @@ class EnhancedAuthService:
             st.markdown("---")
             st.markdown("**Enterprise Features 🔒**")
             st.caption("Available in Enterprise plan")
-    
-    def show_user_settings(self):
-        """Show user settings modal"""
-        pass
+        
+        def show_user_settings(self):
+            """Show user settings modal"""
+            pass
