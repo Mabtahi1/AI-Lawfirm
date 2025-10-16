@@ -3,120 +3,74 @@ Subscription Plans Configuration
 """
 
 SUBSCRIPTION_PLANS = {
-    "basic": {
-        "name": "Basic Plan",
-        "price": 49,
-        "billing_cycle": "monthly",
-        "description": "Essential legal practice management tools",
-        "features": {
-            # Core Features (Always Available)
-            "document_management": True,
-            "matter_management": True,
-            "time_billing": True,
-            "calendar_tasks": True,
-            "client_portal": True,
-            
-            # AI Features (Not Available)
-            "ai_insights": False,
-            "case_comparison": False,
-            "advanced_search": False,
-            "business_intelligence": False,
-            
-            # Integrations
-            "integrations": False,
-            "mobile_app": False,
-            "api_access": False,
+    'basic': {
+        'name': 'Basic',
+        'price': 0,
+        'features': {
+            'document_management': True,
+            'matter_management': True,
+            'time_billing': True,
+            'calendar': True,
+            'case_comparison': False,  # Not available
+            'ai_insights': False,
+            'advanced_search': False,
+            'business_intelligence': False,
         },
-        "limits": {
-            "max_matters": 50,
-            "max_documents": 500,
-            "max_users": 3,
-            "storage_gb": 10,
-            
-            # AI Usage Limits (0 = Not Available)
-            "ai_insights_per_month": 0,
-            "case_comparisons_per_month": 0,
-            "advanced_searches_per_month": 0,
-        },
-        "support": "Email support (48h response)"
+        'limits': {
+            'max_users': 1,
+            'max_documents': 100,
+            'max_matters': 10,
+            'case_comparison_per_month': 0,  # Not available
+            'ai_insights_per_month': 0,
+            'advanced_search_per_month': 0,
+        }
     },
-    
-    "professional": {
-        "name": "Professional Plan",
-        "price": 149,
-        "billing_cycle": "monthly",
-        "description": "Advanced AI-powered legal analytics with usage limits",
-        "features": {
-            # Core Features (Always Available)
-            "document_management": True,
-            "matter_management": True,
-            "time_billing": True,
-            "calendar_tasks": True,
-            "client_portal": True,
-            
-            # AI Features (Limited)
-            "ai_insights": True,
-            "case_comparison": True,
-            "advanced_search": True,
-            "business_intelligence": True,
-            
-            # Integrations
-            "integrations": True,
-            "mobile_app": True,
-            "api_access": False,
+    'professional': {
+        'name': 'Professional',
+        'price': 99,
+        'features': {
+            'document_management': True,
+            'matter_management': True,
+            'time_billing': True,
+            'calendar': True,
+            'case_comparison': True,
+            'ai_insights': True,
+            'advanced_search': True,
+            'business_intelligence': True,
         },
-        "limits": {
-            "max_matters": 200,
-            "max_documents": 5000,
-            "max_users": 10,
-            "storage_gb": 100,
-            
-            # AI Usage Limits (Per Month)
-            "ai_insights_per_month": 50,
-            "case_comparisons_per_month": 25,
-            "advanced_searches_per_month": 100,
-        },
-        "support": "Priority email + chat support (24h response)"
+        'limits': {
+            'max_users': 10,
+            'max_documents': 1000,
+            'max_matters': 100,
+            'case_comparison_per_month': 50,
+            'ai_insights_per_month': 100,
+            'advanced_search_per_month': 200,
+        }
     },
-    
-    "enterprise": {
-        "name": "Enterprise Plan",
-        "price": 499,
-        "billing_cycle": "monthly",
-        "description": "Unlimited AI features and premium support",
-        "features": {
-            # Core Features (Always Available)
-            "document_management": True,
-            "matter_management": True,
-            "time_billing": True,
-            "calendar_tasks": True,
-            "client_portal": True,
-            
-            # AI Features (Unlimited)
-            "ai_insights": True,
-            "case_comparison": True,
-            "advanced_search": True,
-            "business_intelligence": True,
-            
-            # Integrations
-            "integrations": True,
-            "mobile_app": True,
-            "api_access": True,
-            "white_label": True,
-            "custom_integrations": True,
+    'enterprise': {
+        'name': 'Enterprise',
+        'price': 299,
+        'features': {
+            'document_management': True,
+            'matter_management': True,
+            'time_billing': True,
+            'calendar': True,
+            'case_comparison': True,
+            'ai_insights': True,
+            'advanced_search': True,
+            'business_intelligence': True,
+            'integrations': True,
+            'api_access': True,
+            'custom_workflows': True,
         },
-        "limits": {
-            "max_matters": -1,  # -1 = Unlimited
-            "max_documents": -1,
-            "max_users": -1,
-            "storage_gb": -1,
-            
-            # AI Usage Limits (-1 = Unlimited)
-            "ai_insights_per_month": -1,
-            "case_comparisons_per_month": -1,
-            "advanced_searches_per_month": -1,
-        },
-        "support": "24/7 phone + email + chat support + dedicated account manager"
+        'limits': {
+            'max_users': -1,  # Unlimited
+            'max_documents': -1,  # Unlimited
+            'max_matters': -1,  # Unlimited
+            'case_comparison_per_month': -1,  # Unlimited
+            'ai_insights_per_month': -1,  # Unlimited
+            'advanced_search_per_month': -1,  # Unlimited
+        }
     }
 }
 
