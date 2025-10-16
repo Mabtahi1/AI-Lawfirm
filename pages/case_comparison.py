@@ -4,17 +4,21 @@ import pandas as pd
 def show():
     """Display the case comparison page"""
     
-    # Get user's organization with fallback
+    # Get user's organization
     user_data = st.session_state.get('user_data', {})
-    org_code = user_data.get('organization_code', 'ORG003')  # Default to enterprise for demo
+    org_code = user_data.get('organization_code')
     
-    # Try to import services with error handling
+    if not org_code:
+        st.error("Please log in to access this feature")
+        return
+    
+    # Import subscription manager
     try:
         from services.subscription_manager import SubscriptionManager
         subscription_manager = SubscriptionManager()
     except Exception as e:
-        st.warning(f"Subscription service unavailable: {e}")
-        subscription_manager = None
+        st.error(f"Subscription service unavailable: {e}")
+        return
     
     # Professional header styling
     st.markdown("""
@@ -47,7 +51,7 @@ def show():
             radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
         pointer-events: none;
     }
-    /* Sidebar styling - must be in each page file */
+    /* Sidebar styling */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #667eea 0%, #764ba2 100%) !important;
         padding: 0 !important;
@@ -93,17 +97,14 @@ def show():
         margin-bottom: 0.5rem;
         font-weight: 700;
     }
-    /* Default: Light text everywhere */
     * {
         color: #e2e8f0 !important;
     }
     
-    /* Headers - light */
     h1, h2, h3, h4, h5, h6 {
         color: #f1f5f9 !important;
     }
     
-    /* Dark text ONLY inside white expander boxes */
     [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
         background: white !important;
     }
@@ -112,7 +113,6 @@ def show():
         color: #1e293b !important;
     }
     
-    /* Dark text in forms */
     [data-testid="stForm"] {
         background: rgba(255, 255, 255, 0.95) !important;
     }
@@ -121,7 +121,6 @@ def show():
         color: #1e293b !important;
     }
     
-    /* Metrics - keep colored */
     [data-testid="stMetricValue"] {
         color: #60a5fa !important;
     }
@@ -130,23 +129,19 @@ def show():
         color: #cbd5e1 !important;
     }
     
-    /* Input fields */
     input, textarea, select {
         color: #1e293b !important;
         background: white !important;
     }
     
-    /* Buttons */
     .stButton button * {
         color: white !important;
     }
     
-    /* Info/warning/error boxes - keep light text */
     .stAlert, .stSuccess, .stWarning, .stError, .stInfo {
         color: #1e293b !important;
     }
 
-    /* Dropdown menus - dark text */
     [data-baseweb="select"] [role="listbox"],
     [data-baseweb="select"] [role="option"],
     [data-baseweb="popover"] {
@@ -159,7 +154,6 @@ def show():
         color: #1e293b !important;
     }
     
-    /* Dropdown list items */
     [data-baseweb="menu"] li,
     [data-baseweb="menu"] li *,
     div[role="listbox"] li,
@@ -168,7 +162,6 @@ def show():
         background: white !important;
     }
     
-    /* Select/dropdown text */
     .stSelectbox [data-baseweb="select"] > div {
         color: #1e293b !important;
     }
@@ -197,28 +190,25 @@ def show():
         background-color: rgba(59, 130, 246, 0.8);
         color: white;
     }
-    
-
     </style>
     <div class="ai-header">
-        <h1>🤖 AI Legal Insights</h1>
-        <p>AI-powered document analysis, contract review, and legal intelligence</p>
+        <h1>🔍 AI Case Comparison</h1>
+        <p>AI-powered case analysis and similarity detection</p>
     </div>
     """, unsafe_allow_html=True)
     
+    # Get subscription details
+    subscription = subscription_manager.get_organization_subscription(org_code)
+    plan_name = subscription.get('plan', 'basic')
+    
+    # Enterprise users always have access
+    if plan_name == 'enterprise':
+        can_use = True
+        status = "Unlimited ✨"
+    else:
+        can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'case_comparison')
+    
     # Show usage status
-    plan_name = 'enterprise'  # Default
-    can_use = True
-    status = "Available"
-    
-    if subscription_manager and org_code:
-        try:
-            subscription = subscription_manager.get_organization_subscription(org_code)
-            plan_name = subscription.get('plan', 'enterprise')
-            can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'case_comparison')
-        except Exception as e:
-            st.info(f"Using demo mode: {e}")
-    
     col_status1, col_status2, col_status3 = st.columns(3)
     
     with col_status1:
@@ -226,12 +216,9 @@ def show():
     
     with col_status2:
         if plan_name == 'professional':
-            try:
-                usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
-                limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
-                st.metric("Usage This Month", f"{usage}/{limit}")
-            except:
-                st.metric("Usage This Month", "0/25")
+            usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
+            limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
+            st.metric("Usage This Month", f"{usage}/{limit}")
         elif plan_name == 'enterprise':
             st.metric("Usage", "Unlimited ✨")
         else:
@@ -254,7 +241,7 @@ def show():
     tab1, tab2, tab3 = st.tabs(["🆕 New Case Analysis", "📊 Bulk Comparison", "📈 Similarity Matrix"])
     
     with tab1:
-        show_new_case_comparison(subscription_manager, org_code)
+        show_new_case_comparison(subscription_manager, org_code, plan_name)
     
     with tab2:
         show_bulk_comparison()
@@ -352,7 +339,7 @@ def show_upgrade_prompt(current_plan, status):
             st.session_state['current_page'] = 'Billing Management'
             st.rerun()
 
-def show_new_case_comparison(subscription_manager, org_code):
+def show_new_case_comparison(subscription_manager, org_code, plan_name):
     """Show new case comparison interface with usage tracking"""
     
     st.subheader("Compare New Case with Historical Cases")
@@ -405,15 +392,31 @@ def show_new_case_comparison(subscription_manager, org_code):
         # Display available cases
         st.write(f"**Available Cases:** {len(all_matters)}")
         
+        # Convert matters to dict format if they're objects
+        matter_titles = []
+        for m in all_matters:
+            if hasattr(m, 'name'):
+                matter_titles.append(m.name)
+            elif isinstance(m, dict):
+                matter_titles.append(m.get('name', m.get('title', 'Unknown')))
+        
         # Multi-select for case selection
         selected_case_titles = st.multiselect(
             "Select cases to compare",
-            options=[m['title'] for m in all_matters],
-            default=[m['title'] for m in all_matters[:min(5, len(all_matters))]]
+            options=matter_titles,
+            default=matter_titles[:min(5, len(matter_titles))]
         )
         
         # Filter selected cases
-        selected_cases = [m for m in all_matters if m['title'] in selected_case_titles]
+        selected_cases = []
+        for m in all_matters:
+            if hasattr(m, 'name'):
+                if m.name in selected_case_titles:
+                    selected_cases.append(m)
+            elif isinstance(m, dict):
+                title = m.get('name', m.get('title', 'Unknown'))
+                if title in selected_case_titles:
+                    selected_cases.append(m)
         
         st.info(f"Selected {len(selected_cases)} cases for comparison")
     
@@ -437,29 +440,23 @@ def show_new_case_comparison(subscription_manager, org_code):
                 import time
                 time.sleep(2)
                 
-                # Increment usage counter if subscription manager available
-                if subscription_manager and org_code:
-                    try:
-                        subscription_manager.increment_feature_usage(org_code, 'case_comparison')
-                    except:
-                        pass
+                # Increment usage counter ONLY for non-enterprise users
+                if plan_name != 'enterprise':
+                    subscription_manager.increment_feature_usage(org_code, 'case_comparison')
             
             st.success("✅ Analysis complete!")
             
-            # Show updated usage
-            if subscription_manager and org_code:
-                try:
-                    usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
-                    limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
-                    
-                    if limit != -1:
-                        remaining = limit - usage
-                        if remaining > 0:
-                            st.info(f"📊 You have {remaining} comparisons remaining this month")
-                        else:
-                            st.warning("⚠️ You've reached your monthly limit")
-                except:
-                    pass
+            # Show updated usage (only for non-enterprise)
+            if plan_name == 'professional':
+                usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
+                limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
+                remaining = limit - usage
+                if remaining > 0:
+                    st.info(f"📊 You have {remaining} comparisons remaining this month")
+                else:
+                    st.warning("⚠️ You've reached your monthly limit")
+            elif plan_name == 'enterprise':
+                st.success("✨ Unlimited comparisons available")
             
             # Display mock results
             st.markdown("---")
@@ -489,11 +486,24 @@ def show_new_case_comparison(subscription_manager, org_code):
                 st.markdown("### 🎯 Most Similar Cases")
                 for i, case in enumerate(selected_cases[:3], 1):
                     similarity = 85 - (i * 5)
+                    
+                    # Handle both object and dict formats
+                    if hasattr(case, 'name'):
+                        case_title = case.name
+                        case_type = getattr(case, 'matter_type', 'N/A')
+                        case_status = getattr(case, 'status', 'N/A')
+                        case_attorney = getattr(case, 'assigned_attorneys', ['N/A'])[0] if hasattr(case, 'assigned_attorneys') and case.assigned_attorneys else 'N/A'
+                    else:
+                        case_title = case.get('name', case.get('title', 'Unknown'))
+                        case_type = case.get('type', case.get('matter_type', 'N/A'))
+                        case_status = case.get('status', 'N/A')
+                        case_attorney = case.get('lead_attorney', 'N/A')
+                    
                     st.markdown(f"""
-                    **{i}. {case['title']}** ({similarity}% similar)
-                    - Type: {case.get('type', 'N/A')}
-                    - Status: {case.get('status', 'N/A')}
-                    - Lead: {case.get('lead_attorney', 'N/A')}
+                    **{i}. {case_title}** ({similarity}% similar)
+                    - Type: {case_type}
+                    - Status: {case_status}
+                    - Lead: {case_attorney}
                     """)
             
             with col2:
@@ -524,7 +534,7 @@ Compared with {len(selected_cases)} historical cases
 Overall similarity: 78%
 
 SIMILAR CASES:
-{chr(10).join([f"- {c['title']}" for c in selected_cases[:3]])}
+{chr(10).join([f"- {c.name if hasattr(c, 'name') else c.get('name', c.get('title', 'Unknown'))}" for c in selected_cases[:3]])}
 
 RECOMMENDATIONS:
 - Review precedents from similar cases
@@ -577,5 +587,6 @@ def show_similarity_matrix():
     # Mock visualization
     st.image("https://via.placeholder.com/800x400/1e3a8a/ffffff?text=Similarity+Matrix+Visualization+Coming+Soon", 
              use_container_width=True)
+
 if __name__ == "__main__":
     show()
