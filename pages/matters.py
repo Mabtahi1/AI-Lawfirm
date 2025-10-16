@@ -197,16 +197,17 @@ def initialize_matter_session_state():
         st.session_state.matters.extend(sample_matters)
 
 def show():
-    # Convert all time entries to objects once
+    # Convert all time entries to objects once at the START
     if 'time_entries' in st.session_state:
-        time_entries = [dict_to_obj(entry) for entry in st.session_state.time_entries]
+        time_entries = [dict_to_obj(entry) if isinstance(entry, dict) else entry 
+                       for entry in st.session_state.time_entries]
     else:
         time_entries = []
     
-    # Now use time_entries with dot notation
+    # Now use time_entries with getattr() since they're SimpleNamespace objects
     total_unbilled_hours = sum(
-        entry.get('hours', 0) for entry in time_entries 
-        if entry.get('status') == "draft" and entry.get('billable', False)
+        getattr(entry, 'hours', 0) for entry in time_entries 
+        if getattr(entry, 'status', None) == "draft" and getattr(entry, 'billable', False)
     )
     # Professional header styling
     st.markdown("""
