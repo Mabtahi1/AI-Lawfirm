@@ -3,6 +3,17 @@ import pandas as pd
 from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
+from types import SimpleNamespace
+
+def dict_to_obj(d):
+    """Convert dict to SimpleNamespace object"""
+    return SimpleNamespace(**d)
+
+def get_attr(item, attr, default=None):
+    """Helper to get attribute from dict or object"""
+    if isinstance(item, dict):
+        return item.get(attr, default)
+    return getattr(item, attr, default)
 
 def show():
     """Display the Time & Billing page"""
@@ -251,7 +262,7 @@ def show_billing_metrics():
     )
     
     this_month_revenue = sum(
-        getattr(entry, 'hours', 0) * getattr(entry, 'billable_rate', 0) 
+        getattr(entry, 'hours', 0) * getattr(entry, 'billable_rate', getattr(entry, 'rate', 0))
         for entry in time_entries
         if isinstance(getattr(entry, 'date', None), datetime) and 
            getattr(entry, 'date').month == current_month and
@@ -265,7 +276,7 @@ def show_billing_metrics():
     )
     
     total_unbilled_revenue = sum(
-        getattr(entry, 'hours', 0) * getattr(entry, 'billable_rate', 0) 
+        getattr(entry, 'hours', 0) * getattr(entry, 'billable_rate', getattr(entry, 'rate', 0))
         for entry in time_entries 
         if getattr(entry, 'status', None) == "draft" and 
            getattr(entry, 'billable', False)
@@ -323,9 +334,9 @@ def show_time_tracking():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Get matters for dropdown
+        # Get matters for dropdown - use get_attr helper
         matters = st.session_state.get('matters', [])
-        matter_options = ["Select a matter..."] + [m.get('title', 'Untitled') for m in matters]
+        matter_options = ["Select a matter..."] + [get_attr(m, 'name', 'Untitled') for m in matters]
         
         with st.form("time_entry_form"):
             selected_matter = st.selectbox("Matter/Case", matter_options)
@@ -394,9 +405,9 @@ def show_time_tracking():
         # Quick stats
         st.markdown("### 📊 Today's Time")
         today = datetime.now().strftime('%Y-%m-%d')
-        today_entries = [e for e in st.session_state.time_entries if e.get('date') == today]
-        today_hours = sum(e.get('hours', 0) for e in today_entries)
-        today_amount = sum(e.get('amount', 0) for e in today_entries)
+        today_entries = [e for e in st.session_state.time_entries if get_attr(e, 'date', '') == today]
+        today_hours = sum(get_attr(e, 'hours', 0) for e in today_entries)
+        today_amount = sum(get_attr(e, 'amount', 0) for e in today_entries)
         
         st.metric("Hours Logged", f"{today_hours:.1f}")
         st.metric("Amount", f"${today_amount:,.2f}")
@@ -409,7 +420,7 @@ def show_time_tracking():
     col_filter1, col_filter2, col_filter3 = st.columns(3)
     
     with col_filter1:
-        filter_matter = st.selectbox("Filter by Matter", ["All"] + [m.get('title', 'Untitled') for m in matters])
+        filter_matter = st.selectbox("Filter by Matter", ["All"] + [get_attr(m, 'name', 'Untitled') for m in matters])
     
     with col_filter2:
         filter_status = st.selectbox("Status", ["All", "Unbilled", "Billed"])
@@ -421,17 +432,30 @@ def show_time_tracking():
     filtered_entries = st.session_state.time_entries.copy()
     
     if filter_matter != "All":
-        filtered_entries = [e for e in filtered_entries if e.get('matter') == filter_matter]
+        filtered_entries = [e for e in filtered_entries if get_attr(e, 'matter', '') == filter_matter]
     
     if filter_status == "Unbilled":
-        filtered_entries = [e for e in filtered_entries if not e.get('billed', False)]
+        filtered_entries = [e for e in filtered_entries if not get_attr(e, 'billed', False)]
     elif filter_status == "Billed":
-        filtered_entries = [e for e in filtered_entries if e.get('billed', False)]
+        filtered_entries = [e for e in filtered_entries if get_attr(e, 'billed', False)]
     
     # Display entries
     if filtered_entries:
-        df = pd.DataFrame(filtered_entries)
-        df = df[['date', 'matter', 'activity', 'description', 'hours', 'rate', 'amount', 'billed']]
+        # Convert to regular dicts for DataFrame
+        entries_data = []
+        for e in filtered_entries:
+            entries_data.append({
+                'date': get_attr(e, 'date', ''),
+                'matter': get_attr(e, 'matter', ''),
+                'activity': get_attr(e, 'activity', ''),
+                'description': get_attr(e, 'description', ''),
+                'hours': get_attr(e, 'hours', 0),
+                'rate': get_attr(e, 'rate', 0),
+                'amount': get_attr(e, 'amount', 0),
+                'billed': get_attr(e, 'billed', False)
+            })
+        
+        df = pd.DataFrame(entries_data)
         df = df.sort_values('date', ascending=False)
         
         # Style the dataframe
@@ -479,7 +503,7 @@ def show_invoices_list():
         return
     
     # Display invoices
-    for invoice in sorted(invoices, key=lambda x: x.get('date', ''), reverse=True):
+    for invoice in sorted(invoices, key=lambda x: get_attr(x, 'date', ''), reverse=True):
         status_colors = {
             'draft': '#6c757d',
             'sent': '#ffc107',
@@ -487,18 +511,18 @@ def show_invoices_list():
             'overdue': '#dc3545'
         }
         
-        status = invoice.get('status', 'draft')
+        status = get_attr(invoice, 'status', 'draft')
         status_color = status_colors.get(status, '#6c757d')
         
         col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
         
         with col1:
-            st.markdown(f"**{invoice.get('invoice_number', 'N/A')}**")
-            st.caption(invoice.get('client', 'Unknown'))
+            st.markdown(f"**{get_attr(invoice, 'invoice_number', 'N/A')}**")
+            st.caption(get_attr(invoice, 'client', 'Unknown'))
         
         with col2:
-            st.write(f"Date: {invoice.get('date', 'N/A')}")
-            st.caption(f"Due: {invoice.get('due_date', 'N/A')}")
+            st.write(f"Date: {get_attr(invoice, 'date', 'N/A')}")
+            st.caption(f"Due: {get_attr(invoice, 'due_date', 'N/A')}")
         
         with col3:
             st.markdown(f"""
@@ -513,7 +537,7 @@ def show_invoices_list():
             """, unsafe_allow_html=True)
         
         with col4:
-            st.metric("Total", f"${invoice.get('total', 0):,.2f}")
+            st.metric("Total", f"${get_attr(invoice, 'total', 0):,.2f}")
         
         st.markdown("---")
 
