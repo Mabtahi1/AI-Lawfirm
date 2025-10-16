@@ -232,68 +232,56 @@ def show():
         show_billing_settings()
 
 def show_billing_metrics():
-    """Display key billing metrics"""
-    
-    time_entries = st.session_state.time_entries
-    invoices = st.session_state.invoices
-    
-    # Calculate metrics - FIXED with .get()
-    unbilled_hours = sum(entry.get('hours', 0) for entry in time_entries if not entry.get('billed', False))
-    unbilled_amount = sum(entry.get('hours', 0) * entry.get('rate', 0) for entry in time_entries if not entry.get('billed', False))
-    
-    outstanding_invoices = [inv for inv in invoices if inv.get('status') == 'sent']
-    outstanding_amount = sum(inv.get('total', 0) for inv in outstanding_invoices)
-    
-    paid_invoices = [inv for inv in invoices if inv.get('status') == 'paid']
-    paid_amount = sum(inv.get('total', 0) for inv in paid_invoices)
-    
-    # Calculate this month's billable hours
-    current_month = datetime.now().month
-    current_year = datetime.now().year
-    this_month_hours = sum(
-        entry.get('hours', 0) for entry in time_entries 
-        if datetime.strptime(entry.get('date', '2025-01-01'), '%Y-%m-%d').month == current_month
-        and datetime.strptime(entry.get('date', '2025-01-01'), '%Y-%m-%d').year == current_year
-    )
-    
-    # Display metrics
+    """Display billing metrics"""
     col1, col2, col3, col4 = st.columns(4)
     
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+    
+    # Convert entries to objects if needed
+    time_entries = [dict_to_obj(entry) if isinstance(entry, dict) else entry 
+                   for entry in st.session_state.get('time_entries', [])]
+    
+    # Calculate metrics using getattr() and handle datetime objects
+    this_month_hours = sum(
+        getattr(entry, 'hours', 0) for entry in time_entries
+        if isinstance(getattr(entry, 'date', None), datetime) and 
+           getattr(entry, 'date').month == current_month and
+           getattr(entry, 'date').year == current_year
+    )
+    
+    this_month_revenue = sum(
+        getattr(entry, 'hours', 0) * getattr(entry, 'billable_rate', 0) 
+        for entry in time_entries
+        if isinstance(getattr(entry, 'date', None), datetime) and 
+           getattr(entry, 'date').month == current_month and
+           getattr(entry, 'date').year == current_year
+    )
+    
+    total_unbilled_hours = sum(
+        getattr(entry, 'hours', 0) for entry in time_entries 
+        if getattr(entry, 'status', None) == "draft" and 
+           getattr(entry, 'billable', False)
+    )
+    
+    total_unbilled_revenue = sum(
+        getattr(entry, 'hours', 0) * getattr(entry, 'billable_rate', 0) 
+        for entry in time_entries 
+        if getattr(entry, 'status', None) == "draft" and 
+           getattr(entry, 'billable', False)
+    )
+    
     with col1:
-        st.markdown("""
-        <div class="metric-card">
-            <h4 style="color: #666; font-size: 0.9rem;">Unbilled Hours</h4>
-            <h2 style="color: #2E86AB; margin: 0.5rem 0;">{:.1f} hrs</h2>
-            <p style="color: #28a745; font-size: 0.85rem;">${:,.2f}</p>
-        </div>
-        """.format(unbilled_hours, unbilled_amount), unsafe_allow_html=True)
+        st.metric("📊 This Month Hours", f"{this_month_hours:.1f}h")
     
     with col2:
-        st.markdown("""
-        <div class="metric-card">
-            <h4 style="color: #666; font-size: 0.9rem;">Outstanding</h4>
-            <h2 style="color: #ffc107; margin: 0.5rem 0;">${:,.2f}</h2>
-            <p style="color: #666; font-size: 0.85rem;">{} invoices</p>
-        </div>
-        """.format(outstanding_amount, len(outstanding_invoices)), unsafe_allow_html=True)
+        st.metric("💰 This Month Revenue", f"${this_month_revenue:,.2f}")
     
     with col3:
-        st.markdown("""
-        <div class="metric-card">
-            <h4 style="color: #666; font-size: 0.9rem;">Paid This Month</h4>
-            <h2 style="color: #28a745; margin: 0.5rem 0;">${:,.2f}</h2>
-            <p style="color: #666; font-size: 0.85rem;">{} invoices</p>
-        </div>
-        """.format(paid_amount, len(paid_invoices)), unsafe_allow_html=True)
+        st.metric("⏰ Unbilled Hours", f"{total_unbilled_hours:.1f}h")
     
     with col4:
-        st.markdown("""
-        <div class="metric-card">
-            <h4 style="color: #666; font-size: 0.9rem;">Hours This Month</h4>
-            <h2 style="color: #2E86AB; margin: 0.5rem 0;">{:.1f} hrs</h2>
-            <p style="color: #666; font-size: 0.85rem;">Billable time</p>
-        </div>
-        """.format(this_month_hours), unsafe_allow_html=True)
+        st.metric("💵 Unbilled Revenue", f"${total_unbilled_revenue:,.2f}")
 
 def show_time_tracking():
     """Time tracking interface"""
