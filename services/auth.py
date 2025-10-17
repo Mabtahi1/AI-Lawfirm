@@ -1,7 +1,6 @@
 import streamlit as st
 from datetime import datetime, timedelta
 import hashlib
-import uuid
 
 class AuthService:
     """Authentication service with login and registration"""
@@ -17,7 +16,7 @@ class AuthService:
         if 'user_data' not in st.session_state:
             st.session_state.user_data = {}
         
-        # Initialize users database (in production, use real database)
+        # Initialize users database
         if 'users_db' not in st.session_state:
             st.session_state.users_db = self.get_demo_users()
         
@@ -64,8 +63,7 @@ class AuthService:
                 'plan': 'basic',
                 'status': 'active',
                 'start_date': datetime.now().isoformat(),
-                'billing_cycle': 'monthly',
-                'trial_end': (datetime.now() + timedelta(days=14)).isoformat()
+                'billing_cycle': 'monthly'
             },
             'demopro': {
                 'plan': 'professional',
@@ -99,10 +97,6 @@ class AuthService:
         if user['password'] != self.hash_password(password):
             return False, "Invalid email or password"
         
-        # Check email verification
-        if not user.get('email_verified', False):
-            return False, "Please verify your email address first"
-        
         # Get organization code
         org_code = user.get('organization_code')
         
@@ -114,6 +108,7 @@ class AuthService:
         
         # Set session
         st.session_state.authenticated = True
+        st.session_state.logged_in = True  # Added this
         st.session_state.user_data = {
             'email': email,
             'name': user['name'],
@@ -149,7 +144,7 @@ class AuthService:
             'organization_code': organization_code,
             'role': 'subscription_owner',
             'created_at': datetime.now().isoformat(),
-            'email_verified': True  # Auto-verify for demo (in production, send email)
+            'email_verified': True
         }
         
         # Create subscription with trial
@@ -163,21 +158,19 @@ class AuthService:
         
         return True, "Account created successfully"
     
+    def show_login(self):
+        """Show login/signup page"""
+        # Import here to avoid circular import
+        import main_login
+        main_login.show_login_page(self)
+    
+    def render_sidebar(self):
+        """Render sidebar for logged in users"""
+        # This will be implemented by your existing app
+        pass
+    
     def logout(self):
         """Logout user"""
         st.session_state.authenticated = False
+        st.session_state.logged_in = False
         st.session_state.user_data = {}
-    
-    def is_authenticated(self):
-        """Check if user is authenticated"""
-        return st.session_state.get('authenticated', False)
-    
-    def get_user_data(self):
-        """Get current user data"""
-        return st.session_state.get('user_data', {})
-    
-    def require_auth(self):
-        """Require authentication - redirect to login if not authenticated"""
-        if not self.is_authenticated():
-            st.warning("⚠️ Please login to access this page")
-            st.stop()
