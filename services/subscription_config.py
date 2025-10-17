@@ -5,7 +5,7 @@ Subscription Plans Configuration
 SUBSCRIPTION_PLANS = {
     'basic': {
         'name': 'Basic',
-        'price': 0,
+        'price': 299,
         'features': {
             'document_management': True,
             'matter_management': True,
@@ -27,7 +27,7 @@ SUBSCRIPTION_PLANS = {
     },
     'professional': {
         'name': 'Professional',
-        'price': 99,
+        'price': 599,
         'features': {
             'document_management': True,
             'matter_management': True,
@@ -49,7 +49,7 @@ SUBSCRIPTION_PLANS = {
     },
     'enterprise': {
         'name': 'Enterprise',
-        'price': 299,
+        'price': 999,
         'features': {
             'document_management': True,
             'matter_management': True,
@@ -89,3 +89,18 @@ FEATURE_DISPLAY = {
     "mobile_app": {"name": "Mobile App", "icon": "📱"},
     "api_access": {"name": "API Access", "icon": "🔌"},
 }
+
+
+def get_plan_details(plan_name):
+    """Get details for a specific plan"""
+    return SUBSCRIPTION_PLANS.get(plan_name, SUBSCRIPTION_PLANS['basic'])
+
+def get_feature_limit(plan_name, feature_key):
+    """Get the monthly limit for a specific feature"""
+    plan = SUBSCRIPTION_PLANS.get(plan_name, SUBSCRIPTION_PLANS['basic'])
+    return plan['limits'].get(f"{feature_key}_per_month", 0)
+
+def has_feature_access(plan_name, feature_key):
+    """Check if a plan has access to a specific feature"""
+    plan = SUBSCRIPTION_PLANS.get(plan_name, SUBSCRIPTION_PLANS['basic'])
+    return plan['features'].get(feature_key, False)
