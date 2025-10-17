@@ -225,6 +225,41 @@ class EnhancedAuthService:
         st.session_state.logged_in = False
         st.session_state.user_data = None
         st.session_state.current_page = 'Executive Dashboard'
+
+    def register(self, email, password, name, organization_name, organization_code, plan='basic'):
+        """Register new user"""
+        email = email.lower().strip()
+        organization_code = organization_code.lower().strip()
+        
+        # Validation
+        if email in st.session_state.users_db:
+            return False, "Email already exists"
+        
+        if any(u.get('organization_code') == organization_code 
+               for u in st.session_state.users_db.values()):
+            return False, "Organization code already taken"
+        
+        # Create user
+        st.session_state.users_db[email] = {
+            'password': self.hash_password(password),
+            'name': name,
+            'organization_name': organization_name,
+            'organization_code': organization_code,
+            'role': 'subscription_owner',
+            'created_at': datetime.now().isoformat(),
+            'email_verified': True
+        }
+        
+        # Create subscription
+        st.session_state.subscriptions[organization_code] = {
+            'plan': plan,
+            'status': 'trial',
+            'start_date': datetime.now().isoformat(),
+            'trial_end': (datetime.now() + timedelta(days=14)).isoformat(),
+            'billing_cycle': 'monthly'
+        }
+        
+        return True, "Account created successfully"
     
     def show_login(self):
         """Show login/signup page"""
