@@ -244,7 +244,7 @@ def show():
         st.markdown("""
         <div style="padding: 1.5rem; background: rgba(255,255,255,0.05); border-radius: 10px; border: 2px solid #6c757d;">
             <h3 style="color: #6c757d;">Basic Plan</h3>
-            <h2>$0<span style="font-size: 1rem;">/month</span></h2>
+            <h2>$299<span style="font-size: 1rem;">/month</span></h2>
             <hr>
             <p>✅ Document management</p>
             <p>✅ Basic matter tracking</p>
@@ -267,7 +267,7 @@ def show():
         st.markdown("""
         <div style="padding: 1.5rem; background: rgba(0,123,255,0.1); border-radius: 10px; border: 2px solid #007bff;">
             <h3 style="color: #007bff;">Professional Plan</h3>
-            <h2>$149<span style="font-size: 1rem;">/month</span></h2>
+            <h2>$599<span style="font-size: 1rem;">/month</span></h2>
             <hr>
             <p>✅ Everything in Basic</p>
             <p>✅ 25 AI comparisons/month</p>
@@ -294,7 +294,7 @@ def show():
         st.markdown("""
         <div style="padding: 1.5rem; background: rgba(40,167,69,0.1); border-radius: 10px; border: 2px solid #28a745;">
             <h3 style="color: #28a745;">Enterprise Plan</h3>
-            <h2>$499<span style="font-size: 1rem;">/month</span></h2>
+            <h2>$999<span style="font-size: 1rem;">/month</span></h2>
             <hr>
             <p>✅ Everything in Professional</p>
             <p>✅ <strong>Unlimited</strong> AI features</p>
@@ -352,7 +352,7 @@ def show():
     billing_data = pd.DataFrame({
         'Date': ['2025-01-01', '2024-12-01', '2024-11-01'],
         'Description': [f'{current_plan.title()} Plan', f'{current_plan.title()} Plan', f'{current_plan.title()} Plan'],
-        'Amount': ['$149.00' if current_plan == 'professional' else ('$499.00' if current_plan == 'enterprise' else '$0.00')] * 3,
+        'Amount': ['$299.00' if current_plan == 'professional' else ('$599.00' if current_plan == 'enterprise' else '$999.00')] * 3,
         'Status': ['Paid', 'Paid', 'Paid']
     })
     
@@ -376,9 +376,9 @@ def handle_upgrade(subscription_manager, org_code, new_plan):
     """Handle plan upgrade"""
     
     plan_prices = {
-        'basic': '$0',
-        'professional': '$149',
-        'enterprise': '$499'
+        'basic': '$299',
+        'professional': '$599',
+        'enterprise': '$999'
     }
     
     st.markdown("---")
