@@ -55,8 +55,8 @@ class PaymentService:
             st.error(f"Error creating payment intent: {str(e)}")
             return None
     
-    def create_subscription(self, customer_id, price_id):
-        """Create a Stripe subscription"""
+    def create_subscription(self, customer_id, plan_name):
+        """Create a Stripe subscription using plan name"""
         
         if not self.stripe_secret:
             # Development mode
@@ -67,10 +67,21 @@ class PaymentService:
             }
         
         try:
+            # Get price ID from config
+            plan_details = SUBSCRIPTION_PLANS.get(plan_name)
+            if not plan_details:
+                raise ValueError(f"Invalid plan: {plan_name}")
+            
+            price_id = plan_details.get('stripe_price_id')
+            if not price_id:
+                raise ValueError(f"No Stripe price ID configured for {plan_name}")
+            
+            # Create subscription
             subscription = stripe.Subscription.create(
                 customer=customer_id,
                 items=[{'price': price_id}],
-                trial_period_days=14
+                trial_period_days=14,
+                metadata={'plan': plan_name}
             )
             return subscription
         except Exception as e:
