@@ -227,80 +227,154 @@ class EnhancedAuthService:
         st.session_state.current_page = 'Executive Dashboard'
     
     def show_login(self):
-        """Show login page"""
-        st.markdown("""
-        <div class="main-header">
-            <h1>⚖️ LegalDoc Pro</h1>
-            <p>Enterprise Legal Management Platform</p>
-        </div>
-        """, unsafe_allow_html=True)
+        """Show login/signup page"""
         
+        # CSS Styling
+        st.markdown("""
+        <style>
+        .stApp {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    
+        # Initialize session state for form toggle
+        if 'show_signup_form' not in st.session_state:
+            st.session_state.show_signup_form = False
+    
+        # Center container
         col1, col2, col3 = st.columns([1, 2, 1])
         
         with col2:
-            st.markdown("### Login to Your Account")
-            
-            # Show demo accounts info
-            with st.expander("📝 Demo Accounts", expanded=False):
-                st.info("""
-                **Basic Plan:** basic@demo.com / demo123
-                **Professional Plan:** pro@demo.com / demo123  
-                **Enterprise Plan:** enterprise@demo.com / demo123
-                """)
-            
-            email = st.text_input("Email", placeholder="your@email.com")
-            password = st.text_input("Password", type="password")
-            
-            remember_me = st.checkbox("Remember me")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            if st.button("Login", use_container_width=True, type="primary"):
-                # Check if user exists
-                users = st.session_state.get('users', {})
+            # Header
+            st.markdown("""
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h1 style="color: white;">⚖️ LegalDoc Pro</h1>
+                <p style="color: white; font-size: 1.1rem;">Enterprise Legal Management Platform</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+            # Show either login or signup form
+            if not st.session_state.show_signup_form:
+                # ============= LOGIN FORM =============
+                st.markdown("### 🔑 Login to Your Account")
                 
-                if email in users:
-                    # Verify password
-                    stored_password = users[email]['password']
+                # Demo accounts
+                with st.expander("📝 Demo Accounts"):
+                    st.markdown("""
+                    **Starter:** basic@demo.com / demo123  
+                    **Professional:** pro@demo.com / demo123  
+                    **Enterprise:** enterprise@demo.com / demo123
+                    """)
+                
+                with st.form("login_form"):
+                    email = st.text_input("📧 Email", placeholder="your@email.com")
+                    password = st.text_input("🔒 Password", type="password")
+                    remember_me = st.checkbox("Remember me")
                     
-                    if AuthTokenManager.verify_password(password, stored_password):
-                        # Valid login
-                        user_data = users[email]['data']
+                    submitted = st.form_submit_button("🚀 Login", use_container_width=True)
+                    
+                    if submitted:
+                        if not email or not password:
+                            st.error("⚠️ Please enter email and password")
+                        else:
+                            success, message = self.login(email, password)
+                            if success:
+                                st.success("✅ Login successful!")
+                                import time
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {message}")
+                
+                # Signup button
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("✨ Don't have an account? Sign Up", use_container_width=True):
+                    st.session_state.show_signup_form = True
+                    st.rerun()
+    
+            else:
+                # ============= SIGNUP FORM =============
+                st.markdown("### ✨ Create Your Account")
+                st.info("🎉 14-day free trial. No credit card required!")
+                
+                with st.form("signup_form"):
+                    st.markdown("#### 🏢 Organization")
+                    org_name = st.text_input("Firm Name*", placeholder="Smith Law Firm")
+                    org_code = st.text_input("Organization Code*", placeholder="smithlaw")
+                    
+                    st.markdown("#### 👤 Your Information")
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        first_name = st.text_input("First Name*")
+                    with col_b:
+                        last_name = st.text_input("Last Name*")
+                    
+                    email = st.text_input("📧 Email*", placeholder="john@smithlaw.com")
+                    
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        password = st.text_input("🔒 Password*", type="password", placeholder="Min. 8 chars")
+                    with col_b:
+                        confirm_password = st.text_input("🔒 Confirm*", type="password")
+                    
+                    st.markdown("#### 💳 Choose Plan")
+                    plan = st.selectbox("Select Plan", [
+                        "Starter - $299/month",
+                        "Professional - $599/month",
+                        "Enterprise - $999/month"
+                    ])
+                    
+                    agree = st.checkbox("I agree to Terms of Service")
+                    
+                    submitted = st.form_submit_button("🚀 Create Account", use_container_width=True)
+                    
+                    if submitted:
+                        errors = []
                         
-                        org_code = user_data.get('organization_code')
+                        if not all([org_name, org_code, first_name, last_name, email, password]):
+                            errors.append("All fields required")
+                        if password and len(password) < 8:
+                            errors.append("Password must be 8+ characters")
+                        if password != confirm_password:
+                            errors.append("Passwords don't match")
+                        if not agree:
+                            errors.append("Must agree to Terms")
+                        if org_code and (' ' in org_code or org_code != org_code.lower()):
+                            errors.append("Org code: lowercase, no spaces")
                         
-                        if not org_code:
-                            st.error("⚠️ User account missing organization code. Please contact support.")
-                            return
-                        
-                        # Get their subscription
-                        subscription = st.session_state.subscriptions.get(org_code, {})
-                        
-                        # Check if trial expired
-                        if subscription.get('status') == 'trial':
-                            trial_end_str = subscription.get('trial_end_date')
-                            if trial_end_str:
-                                from datetime import datetime
-                                trial_end = datetime.fromisoformat(trial_end_str)
-                                if datetime.now() > trial_end:
-                                    st.error("⚠️ Your trial has expired. Please update your payment information to continue.")
-                                    return
-                        
-                        # Log them in
-                        st.session_state.logged_in = True
-                        st.session_state.user_data = user_data
-                        st.session_state.current_page = 'Executive Dashboard'
-                        
-                        plan = subscription.get('plan', 'basic')
-                        st.success(f"Welcome back, {user_data.get('first_name', user_data['name'])}! ({plan.title()} Plan)")
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid email or password")
-                else:
-                    st.error("❌ Invalid email or password")
-            
-            st.markdown("---")
-            st.caption("Contact your administrator for access")
+                        if errors:
+                            for error in errors:
+                                st.error(f"⚠️ {error}")
+                        else:
+                            plan_name = "basic" if "Starter" in plan else (
+                                "professional" if "Professional" in plan else "enterprise"
+                            )
+                            
+                            success, message = self.register(
+                                email=email,
+                                password=password,
+                                name=f"{first_name} {last_name}",
+                                organization_name=org_name,
+                                organization_code=org_code,
+                                plan=plan_name
+                            )
+                            
+                            if success:
+                                st.success("✅ Account created!")
+                                st.balloons()
+                                import time
+                                time.sleep(2)
+                                st.session_state.show_signup_form = False
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {message}")
+                
+                # Back to login button
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🔑 Already have an account? Login", use_container_width=True):
+                    st.session_state.show_signup_form = False
+                    st.rerun()
     
     def render_sidebar(self):
         """Render sidebar with subscription info"""
