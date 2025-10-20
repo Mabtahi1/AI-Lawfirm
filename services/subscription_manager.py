@@ -27,7 +27,8 @@ class SubscriptionManager:
                     'email': 'basic@demo.com',
                     'organization_code': 'ORG001',
                     'is_subscription_owner': True,
-                    'email_verified': True
+                    'email_verified': True,
+                    'role': 'subscription_owner'
                 }
             },
             'pro@demo.com': {
@@ -38,7 +39,8 @@ class SubscriptionManager:
                     'email': 'pro@demo.com',
                     'organization_code': 'ORG002',
                     'is_subscription_owner': True,
-                    'email_verified': True
+                    'email_verified': True,
+                    'role': 'subscription_owner'
                 }
             },
             'enterprise@demo.com': {
@@ -49,7 +51,8 @@ class SubscriptionManager:
                     'email': 'enterprise@demo.com',
                     'organization_code': 'ORG003',
                     'is_subscription_owner': True,
-                    'email_verified': True
+                    'email_verified': True,
+                    'role': 'subscription_owner'
                 }
             }
         }
