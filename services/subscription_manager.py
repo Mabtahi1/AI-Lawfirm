@@ -253,6 +253,7 @@ class EnhancedAuthService:
             st.session_state.user_data['email'] = email
         
         return True, "Login successful"
+        
     def has_permission(self, permission_type):
         """Check if user has specific permission"""
         # If not logged in, no permissions
