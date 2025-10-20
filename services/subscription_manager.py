@@ -226,6 +226,34 @@ class EnhancedAuthService:
         st.session_state.user_data = None
         st.session_state.current_page = 'Executive Dashboard'
 
+    def login(self, email, password):
+        """Login user with email and password"""
+        email = email.lower().strip()
+        
+        # Check if users exist in session state
+        if 'users' not in st.session_state:
+            st.session_state.users = {}
+        
+        # Check if user exists
+        if email not in st.session_state.users:
+            return False, "Invalid email or password"
+        
+        user = st.session_state.users[email]
+        
+        # Verify password
+        if not AuthTokenManager.verify_password(password, user['password']):
+            return False, "Invalid email or password"
+        
+        # Set logged in state
+        st.session_state.logged_in = True
+        st.session_state.user_data = user.get('data', {})
+        
+        # Ensure user_data has required fields
+        if 'email' not in st.session_state.user_data:
+            st.session_state.user_data['email'] = email
+        
+        return True, "Login successful"
+    
     def register(self, email, password, name, organization_name, organization_code, plan='basic'):
         """Register new user"""
         email = email.lower().strip()
