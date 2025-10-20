@@ -315,7 +315,7 @@ def show_dashboard_stats(auth_service, org_code):
                     st.write(f"**Size:** {doc_size}")
                 
                 with col3:
-                    if st.button("View", key=f"view_{doc_name}"):
+                    if st.button("View", key=f"view_{doc_name}_{idx}"):
                         st.info("Document viewer would open here")
     else:
         st.info("No documents uploaded yet. Use the Upload tab to add your first document.")
