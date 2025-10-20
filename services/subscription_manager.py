@@ -253,7 +253,29 @@ class EnhancedAuthService:
             st.session_state.user_data['email'] = email
         
         return True, "Login successful"
-    
+    def has_permission(self, permission_type):
+        """Check if user has specific permission"""
+        # If not logged in, no permissions
+        if not self.is_logged_in():
+            return False
+        
+        user_data = st.session_state.get('user_data', {})
+        
+        # Subscription owners have all permissions
+        if user_data.get('is_subscription_owner', False):
+            return True
+        
+        # Check role-based permissions
+        role = user_data.get('role', 'viewer')
+        
+        if permission_type == 'write':
+            return role in ['admin', 'editor', 'subscription_owner']
+        elif permission_type == 'read':
+            return role in ['admin', 'editor', 'viewer', 'subscription_owner']
+        elif permission_type == 'admin':
+            return role in ['admin', 'subscription_owner']
+        
+        return False
     def register(self, email, password, name, organization_name, organization_code, plan='basic'):
         """Register new user"""
         email = email.lower().strip()
