@@ -113,11 +113,17 @@ class Matter:
 
 # Import auth service
 try:
-    from services.auth import AuthService
+    from services.subscription_manager import EnhancedAuthService as AuthService
 except ImportError:
-    class AuthService:
-        def has_permission(self, perm):
-            return True
+    try:
+        from services.auth import AuthService
+    except ImportError:
+        class AuthService:
+            def has_permission(self, perm):
+                return True
+            
+            def is_logged_in(self):
+                return True
 
 
 def create_new_user():
