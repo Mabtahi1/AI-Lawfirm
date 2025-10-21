@@ -6,7 +6,7 @@ SUBSCRIPTION_PLANS = {
     'basic': {
         'name': 'Basic',
         'price': 299,
-        "stripe_price_id": "price_1SJHLtEQXwDOB8xDYaWdJhqA",
+        "stripe_price_id": "price_1SKiLPEQXwDOB8xDGwyeHFRy",
         'features': {
             'document_management': True,
             'matter_management': True,
@@ -29,7 +29,7 @@ SUBSCRIPTION_PLANS = {
     'professional': {
         'name': 'Professional',
         'price': 599,
-        "stripe_price_id": "price_1SJHNbEQXwDOB8xDEu6MfOif",
+        "stripe_price_id": "price_1SKiMcEQXwDOB8xD7pu7NGTi",
         'features': {
             'document_management': True,
             'matter_management': True,
@@ -52,7 +52,7 @@ SUBSCRIPTION_PLANS = {
     'enterprise': {
         'name': 'Enterprise',
         'price': 999,
-        "stripe_price_id": "price_1SJHOQEQXwDOB8xDC09VKTV3",
+        "stripe_price_id": "price_1SKiNeEQXwDOB8xDvIEJVGBT",
         'features': {
             'document_management': True,
             'matter_management': True,
