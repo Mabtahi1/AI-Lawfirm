@@ -51,7 +51,7 @@ def show():
             radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
         pointer-events: none;
     }
-    /* Sidebar styling */
+    /* Sidebar styling - must be in each page file */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #667eea 0%, #764ba2 100%) !important;
         padding: 0 !important;
@@ -102,10 +102,12 @@ def show():
         color: #e2e8f0;
     }
     
+    /* Headers - light */
     h1, h2, h3, h4, h5, h6 {
         color: #f1f5f9 !important;
     }
     
+    /* Dark text ONLY inside white expander boxes */
     [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
         background: white !important;
     }
@@ -114,6 +116,57 @@ def show():
         color: #1e293b !important;
     }
     
+    /* ADD THESE NEW RULES: */
+    
+    /* Query Suggestions - white boxes with dark text */
+    .element-container:has(.stButton) {
+        background: white !important;
+        border-radius: 8px !important;
+        padding: 0.5rem !important;
+    }
+    
+    .element-container:has(.stButton) * {
+        color: #1e293b !important;
+    }
+    
+    /* Any white/light background containers should have dark text */
+    [style*="background: white"],
+    [style*="background: #fff"],
+    [style*="background-color: white"],
+    [style*="background-color: #fff"],
+    [style*="background: rgb(255, 255, 255)"] {
+        color: #1e293b !important;
+    }
+    
+    [style*="background: white"] *,
+    [style*="background: #fff"] *,
+    [style*="background-color: white"] *,
+    [style*="background-color: #fff"] *,
+    [style*="background: rgb(255, 255, 255)"] * {
+        color: #1e293b !important;
+    }
+    
+    /* White containers in general */
+    .stContainer[style*="background"],
+    div[style*="background: white"],
+    div[style*="background-color: white"],
+    div[style*="background: #ffffff"] {
+        background: white !important;
+    }
+    
+    .stContainer[style*="background"] *,
+    div[style*="background: white"] *,
+    div[style*="background-color: white"] *,
+    div[style*="background: #ffffff"] * {
+        color: #1e293b !important;
+    }
+    
+    /* Markdown content in white boxes */
+    .stMarkdown[style*="background"] * {
+        color: #1e293b !important;
+    }
+    
+    /* Dark text in forms */
     [data-testid="stForm"] {
         background: rgba(255, 255, 255, 0.95) !important;
     }
@@ -122,6 +175,7 @@ def show():
         color: #1e293b !important;
     }
     
+    /* Metrics - keep colored */
     [data-testid="stMetricValue"] {
         color: #60a5fa !important;
     }
@@ -130,19 +184,23 @@ def show():
         color: #cbd5e1 !important;
     }
     
+    /* Input fields */
     input, textarea, select {
         color: #1e293b !important;
         background: white !important;
     }
     
+    /* Buttons */
     .stButton button * {
         color: white !important;
     }
     
+    /* Info/warning/error boxes - keep light text */
     .stAlert, .stSuccess, .stWarning, .stError, .stInfo {
         color: #1e293b !important;
     }
 
+    /* Dropdown menus - dark text */
     [data-baseweb="select"] [role="listbox"],
     [data-baseweb="select"] [role="option"],
     [data-baseweb="popover"] {
@@ -155,6 +213,7 @@ def show():
         color: #1e293b !important;
     }
     
+    /* Dropdown list items */
     [data-baseweb="menu"] li,
     [data-baseweb="menu"] li *,
     div[role="listbox"] li,
@@ -163,6 +222,7 @@ def show():
         background: white !important;
     }
     
+    /* Select/dropdown text */
     .stSelectbox [data-baseweb="select"] > div {
         color: #1e293b !important;
     }
