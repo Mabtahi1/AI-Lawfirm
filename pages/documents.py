@@ -84,9 +84,9 @@ def show():
         margin-bottom: 0.5rem;
         font-weight: 700;
     }
-    /* Default: Light text everywhere */
-    * {
-        color: #e2e8f0 !important;
+    /* Default: Light text everywhere EXCEPT inside white containers */
+    body, .stApp, p, span, div {
+        color: #e2e8f0;
     }
     
     /* Headers - light */
@@ -100,6 +100,56 @@ def show():
     }
     
     [data-testid="stExpander"] [data-testid="stExpanderDetails"] * {
+        color: #1e293b !important;
+    }
+    
+    /* ADD THESE NEW RULES: */
+    
+    /* Query Suggestions - white boxes with dark text */
+    .element-container:has(.stButton) {
+        background: white !important;
+        border-radius: 8px !important;
+        padding: 0.5rem !important;
+    }
+    
+    .element-container:has(.stButton) * {
+        color: #1e293b !important;
+    }
+    
+    /* Any white/light background containers should have dark text */
+    [style*="background: white"],
+    [style*="background: #fff"],
+    [style*="background-color: white"],
+    [style*="background-color: #fff"],
+    [style*="background: rgb(255, 255, 255)"] {
+        color: #1e293b !important;
+    }
+    
+    [style*="background: white"] *,
+    [style*="background: #fff"] *,
+    [style*="background-color: white"] *,
+    [style*="background-color: #fff"] *,
+    [style*="background: rgb(255, 255, 255)"] * {
+        color: #1e293b !important;
+    }
+    
+    /* White containers in general */
+    .stContainer[style*="background"],
+    div[style*="background: white"],
+    div[style*="background-color: white"],
+    div[style*="background: #ffffff"] {
+        background: white !important;
+    }
+    
+    .stContainer[style*="background"] *,
+    div[style*="background: white"] *,
+    div[style*="background-color: white"] *,
+    div[style*="background: #ffffff"] * {
+        color: #1e293b !important;
+    }
+    
+    /* Markdown content in white boxes */
+    .stMarkdown[style*="background"] * {
         color: #1e293b !important;
     }
     
