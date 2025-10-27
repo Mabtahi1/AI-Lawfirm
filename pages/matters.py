@@ -410,30 +410,101 @@ def show():
         color: #1e293b !important;
     }
 
-    /* Dropdown menus - dark text */
-    [data-baseweb="select"] [role="listbox"],
-    [data-baseweb="select"] [role="option"],
-    [data-baseweb="popover"] {
+    /* Dropdown menus - comprehensive fix */
+
+    /* The dropdown container itself */
+    .stSelectbox,
+    [data-testid="stSelectbox"] {
         background: white !important;
+        border-radius: 8px !important;
     }
     
-    [data-baseweb="select"] [role="listbox"] *,
-    [data-baseweb="select"] [role="option"] *,
-    [data-baseweb="popover"] * {
+    /* Dropdown button/selector - dark text */
+    .stSelectbox [data-baseweb="select"],
+    [data-testid="stSelectbox"] [data-baseweb="select"],
+    .stSelectbox [data-baseweb="select"] > div,
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        background: white !important;
         color: #1e293b !important;
     }
     
-    /* Dropdown list items */
+    /* All text inside the dropdown selector */
+    .stSelectbox [data-baseweb="select"] *,
+    [data-testid="stSelectbox"] [data-baseweb="select"] * {
+        color: #1e293b !important;
+    }
+    
+    /* Dropdown popover/menu when opened */
+    [data-baseweb="popover"],
+    [role="listbox"],
+    [data-baseweb="menu"] {
+        background: white !important;
+    }
+    
+    /* All options in dropdown list */
+    [data-baseweb="popover"] *,
+    [role="listbox"] *,
+    [role="option"],
+    [role="option"] *,
     [data-baseweb="menu"] li,
-    [data-baseweb="menu"] li *,
-    div[role="listbox"] li,
-    div[role="listbox"] li * {
+    [data-baseweb="menu"] li * {
         color: #1e293b !important;
         background: white !important;
     }
     
-    /* Select/dropdown text */
-    .stSelectbox [data-baseweb="select"] > div {
+    /* Selected option */
+    [aria-selected="true"] {
+        background: rgba(59, 130, 246, 0.1) !important;
+        color: #1e293b !important;
+    }
+    
+    /* Hovered option */
+    [role="option"]:hover,
+    [data-baseweb="menu"] li:hover {
+        background: rgba(59, 130, 246, 0.15) !important;
+        color: #1e293b !important;
+    }
+    
+    /* Multi-select tags */
+    .stMultiSelect [data-baseweb="tag"],
+    .stMultiSelect [data-baseweb="tag"] * {
+        background: rgba(59, 130, 246, 0.2) !important;
+        color: #1e293b !important;
+    }
+    
+    /* Dropdown arrow/icon */
+    .stSelectbox svg,
+    [data-testid="stSelectbox"] svg {
+        fill: #1e293b !important;
+    }
+
+    /* Streamlit selectbox - force dark text everywhere */
+    div[data-baseweb="select"] {
+        background: white !important;
+    }
+    
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="select"] > div > div,
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] input {
+        color: #1e293b !important;
+        background: white !important;
+    }
+    
+    /* The actual dropdown panel when opened */
+    ul[role="listbox"] {
+        background: white !important;
+    }
+    
+    ul[role="listbox"] li,
+    ul[role="listbox"] li * {
+        color: #1e293b !important;
+    }
+    
+    /* Force override any remaining light text in dropdowns */
+    [data-baseweb="select"] [data-baseweb="select-dropdown"] *,
+    [data-baseweb="popover-content"] *,
+    .stSelectbox * {
         color: #1e293b !important;
     }
     .metric-card {
