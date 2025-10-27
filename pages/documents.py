@@ -350,7 +350,7 @@ def show_dashboard_stats(auth_service, org_code):
             reverse=True
         )[:10]
         
-        for doc in recent_docs:
+        for idx, doc in recent_docs:
             doc_name = getattr(doc, 'name', 'Unknown Document')
             doc_status = getattr(doc, 'status', 'unknown')
             doc_size = getattr(doc, 'size', 'Unknown size')
@@ -373,7 +373,7 @@ def show_dashboard_stats(auth_service, org_code):
 def show_upload_interface(auth_service, org_code):
     """Document upload interface with subscription-based storage limits"""
     
-    st.subheader("📤 Upload Documents")
+    st.subheader("📤  Documents")
     
     # Get current subscription limits
     subscription = auth_service.subscription_manager.get_organization_subscription(org_code)
