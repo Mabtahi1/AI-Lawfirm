@@ -115,9 +115,10 @@ def show():
 
     </style>
     <div class="ai-header">
-        <h1>AI Legal Insights</h1>
-        <p>AI-powered document analysis, contract review, and legal intelligence</p>
+        <h1>Client Portal</h1>
+        <p>Secure access to your personalized data, insights, and project updates</p>
     </div>
+
     """, unsafe_allow_html=True)
     
     # Client Portal tabs
