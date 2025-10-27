@@ -97,8 +97,9 @@ def show():
         margin-bottom: 0.5rem;
         font-weight: 700;
     }
-    * {
-        color: #e2e8f0 !important;
+    /* Default: Light text everywhere EXCEPT inside white containers */
+    body, .stApp, p, span, div {
+        color: #e2e8f0;
     }
     
     h1, h2, h3, h4, h5, h6 {
