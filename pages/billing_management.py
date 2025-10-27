@@ -239,9 +239,10 @@ def show():
 
     </style>
     <div class="ai-header">
-        <h1>🤖 AI Legal Insights</h1>
-        <p>AI-powered document analysis, contract review, and legal intelligence</p>
+        <h1>💳 Billing Management</h1>
+        <p>Streamlined invoicing, payment tracking, and financial insights</p>
     </div>
+
     """, unsafe_allow_html=True)
     
     # Get user's organization
