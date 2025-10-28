@@ -264,6 +264,24 @@ def show():
     
     if 'invoices' not in st.session_state:
         st.session_state.invoices = load_sample_invoices()
+
+    # Initialize session state for time entries and invoices
+    if 'time_entries' not in st.session_state:
+        st.session_state.time_entries = load_sample_time_entries()
+    
+    if 'invoices' not in st.session_state:
+        st.session_state.invoices = load_sample_invoices()
+    
+    # ADD THIS: Initialize matters for dropdown
+    if 'matters' not in st.session_state:
+        st.session_state.matters = [
+            {'name': 'Johnson Custody Case', 'client': 'Johnson Family', 'status': 'Active'},
+            {'name': 'Smith Contract Dispute', 'client': 'Smith Corp', 'status': 'Active'},
+            {'name': 'TechCorp Merger', 'client': 'TechCorp Industries', 'status': 'Active'},
+            {'name': 'Anderson Real Estate', 'client': 'Anderson Real Estate LLC', 'status': 'Active'},
+            {'name': 'Williams Estate Planning', 'client': 'Williams Family Trust', 'status': 'Active'},
+            {'name': 'Davis Employment Case', 'client': 'Davis Enterprises', 'status': 'Active'}
+        ]
     
     # Quick stats at the top
     show_billing_metrics()
@@ -352,32 +370,120 @@ def show_time_tracking():
     # Quick timer at the top
     col_timer1, col_timer2 = st.columns([2, 1])
     
+    # Initialize timer state
+    if 'timer_running' not in st.session_state:
+        st.session_state.timer_running = False
+    if 'timer_start' not in st.session_state:
+        st.session_state.timer_start = None
+    if 'timer_elapsed' not in st.session_state:
+        st.session_state.timer_elapsed = 0
+    if 'timer_paused_time' not in st.session_state:
+        st.session_state.timer_paused_time = 0
+    
+    # Calculate elapsed time
+    if st.session_state.timer_running and st.session_state.timer_start:
+        elapsed_seconds = int((datetime.now() - st.session_state.timer_start).total_seconds()) + st.session_state.timer_paused_time
+    else:
+        elapsed_seconds = st.session_state.timer_paused_time
+    
+    hours = elapsed_seconds // 3600
+    minutes = (elapsed_seconds % 3600) // 60
+    seconds = elapsed_seconds % 60
+    timer_display = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    
     with col_timer1:
-        st.markdown("""
+        timer_color = "#10b981" if st.session_state.timer_running else "#667eea"
+        st.markdown(f"""
         <div style="
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {timer_color} 0%, #764ba2 100%);
             color: white;
             padding: 2rem;
             border-radius: 16px;
             margin-bottom: 1rem;
         ">
-            <h3 style="margin: 0 0 0.5rem 0;">Quick Timer</h3>
-            <h1 style="margin: 0; font-size: 3rem;">00:00:00</h1>
-            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Click Start to begin tracking time</p>
+            <h3 style="margin: 0 0 0.5rem 0;">Quick Timer {'🟢 RUNNING' if st.session_state.timer_running else '⏸️ STOPPED'}</h3>
+            <h1 style="margin: 0; font-size: 3rem;">{timer_display}</h1>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
+                {'Timer is running - click Pause or Stop' if st.session_state.timer_running else 'Click Start to begin tracking time'}
+            </p>
         </div>
         """, unsafe_allow_html=True)
     
     with col_timer2:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("▶️ Start Timer", use_container_width=True, type="primary"):
-            st.info("Timer feature coming soon!")
-        if st.button("⏸️ Pause", use_container_width=True):
-            st.info("Timer feature coming soon!")
+        
+        # Start button
+        if not st.session_state.timer_running:
+            if st.button("▶️ Start Timer", use_container_width=True, type="primary"):
+                st.session_state.timer_running = True
+                st.session_state.timer_start = datetime.now()
+                st.success("✓ Timer started!")
+                st.rerun()
+        
+        # Pause button
+        if st.session_state.timer_running:
+            if st.button("⏸️ Pause", use_container_width=True):
+                st.session_state.timer_running = False
+                if st.session_state.timer_start:
+                    st.session_state.timer_paused_time += int((datetime.now() - st.session_state.timer_start).total_seconds())
+                st.session_state.timer_start = None
+                st.warning("Timer paused")
+                st.rerun()
+        
+        # Stop & Save button
         if st.button("⏹️ Stop & Save", use_container_width=True):
-            st.info("Timer feature coming soon!")
+            # Calculate final time
+            if st.session_state.timer_running and st.session_state.timer_start:
+                final_seconds = int((datetime.now() - st.session_state.timer_start).total_seconds()) + st.session_state.timer_paused_time
+            else:
+                final_seconds = st.session_state.timer_paused_time
+            
+            final_hours = round(final_seconds / 3600, 2)
+            
+            # Store timer data
+            st.session_state.timer_hours = final_hours
+            st.session_state.timer_matter = st.session_state.get('timer_matter_select', 'Select matter...')
+            st.session_state.timer_activity_type = st.session_state.get('timer_activity_select', 'Other')
+            st.session_state.timer_desc_text = st.session_state.get('timer_desc', '')
+            st.session_state.timer_stopped = True
+            
+            # Reset timer
+            st.session_state.timer_running = False
+            st.session_state.timer_start = None
+            st.session_state.timer_paused_time = 0
+            
+            st.success(f"✓ Timer stopped! {final_hours} hours recorded. Review details below.")
+            st.rerun()
+    
+    # Auto-refresh timer display when running
+    if st.session_state.timer_running:
+        import time
+        time.sleep(0.1)
+        st.rerun()
     
     st.markdown("---")
+    st.markdown("#### What are you working on?")
+    col_matter, col_activity = st.columns(2)
     
+    with col_matter:
+        matters = st.session_state.get('matters', [])
+        matter_options = ["Select matter..."] + [get_attr(m, 'name', 'Untitled') for m in matters]
+        timer_matter = st.selectbox("Matter", matter_options, key="timer_matter_select")
+    
+    with col_activity:
+        timer_activity = st.selectbox("Activity", [
+            "Client Meeting",
+            "Court Appearance", 
+            "Document Review",
+            "Research",
+            "Phone Call",
+            "Email",
+            "Drafting",
+            "Travel",
+            "Other"
+        ], key="timer_activity_select")
+    
+    timer_description = st.text_input("Quick description (optional)", key="timer_desc", placeholder="What are you working on?")
     # Manual time entry form
     st.markdown("### 📝 Manual Time Entry")
     
@@ -395,7 +501,13 @@ def show_time_tracking():
             
             with col_form1:
                 entry_date = st.date_input("Date", datetime.now())
-                hours = st.number_input("Hours", min_value=0.0, max_value=24.0, step=0.25, value=1.0)
+                
+                # Pre-fill hours from timer if available
+                default_hours = st.session_state.get('timer_hours', 1.0)
+                if st.session_state.get('timer_stopped', False):
+                    st.info(f"⏱️ Timer recorded: {default_hours} hours")
+                
+                hours = st.number_input("Hours", min_value=0.0, max_value=24.0, step=0.25, value=default_hours)
             
             with col_form2:
                 activity_type = st.selectbox("Activity Type", [
@@ -439,6 +551,13 @@ def show_time_tracking():
                     }
                     
                     st.session_state.time_entries.append(new_entry)
+                    
+                    # Clear timer flags
+                    if 'timer_hours' in st.session_state:
+                        del st.session_state.timer_hours
+                    if 'timer_stopped' in st.session_state:
+                        del st.session_state.timer_stopped
+                    
                     st.success(f"✅ Time entry saved: {hours} hours for {selected_matter}")
                     st.rerun()
     
