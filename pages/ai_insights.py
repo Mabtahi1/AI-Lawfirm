@@ -431,15 +431,15 @@ def extract_text_from_pdf(uploaded_file):
         return None
 
 def extract_text_from_docx(uploaded_file):
-    """Extract text from Word documents"""
+    """Extract text from Word s"""
     try:
-        doc = docx.Document(uploaded_file)
+        doc = docx.(uploaded_file)
         text = ""
         for paragraph in doc.paragraphs:
             text += paragraph.text + "\n"
         return text
     except Exception as e:
-        st.error(f"Error reading Word document: {str(e)}")
+        st.error(f"Error reading Word : {str(e)}")
         return None
 
 def extract_text_from_image(uploaded_file):
@@ -458,7 +458,7 @@ def extract_text_from_image(uploaded_file):
         st.info("Make sure Tesseract is installed on your system")
         return None
 
-def perform_document_analysis(text, analysis_type):
+def perform__analysis(text, analysis_type):
     """Perform AI analysis on extracted text"""
     # Mock AI analysis - replace with actual AI service calls
     
@@ -473,7 +473,7 @@ def perform_document_analysis(text, analysis_type):
         "sentiment": "neutral"
     }
     
-    if analysis_type == "Full Document Analysis":
+    if analysis_type == "Full  Analysis":
         analysis_results = perform_full_analysis(text)
     elif analysis_type == "Contract Review":
         analysis_results = perform_contract_review(text)
@@ -491,24 +491,51 @@ def perform_document_analysis(text, analysis_type):
     return analysis_results
 
 def perform_full_analysis(text):
-    """Comprehensive document analysis"""
-    # Mock implementation - replace with actual AI
-    word_count = len(text.split())
+    """Comprehensive document analysis using actual text"""
+    if not text or len(text.strip()) < 50:
+        return {"summary": "Document too short for analysis", "key_terms": [], "risk_score": 0}
+    
+    from collections import Counter
+    import re
+    
+    words = text.split()
+    word_count = len(words)
+    sentences = [s.strip() for s in text.split('.') if s.strip()]
+    
+    # Extract actual key terms
+    word_freq = Counter(word.lower().strip('.,!?;:()[]') for word in words if len(word) > 3)
+    key_terms = [word for word, count in word_freq.most_common(10)]
+    
+    # Extract entities
+    orgs = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Inc|LLC|Corp|Company|Ltd)\b', text)
+    dates = re.findall(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text)
+    locations = [loc for loc in ['New York', 'California', 'Delaware', 'Texas'] if loc in text]
+    
+    # Calculate risk score based on actual keywords
+    risk_keywords = ['liability', 'penalty', 'breach', 'indemnify', 'terminate', 'damages']
+    risk_score = min(10, sum(2 for kw in risk_keywords if kw in text.lower()) / 2)
+    
+    # Detect document type
+    doc_type = "General Document"
+    if any(word in text.lower() for word in ['agreement', 'contract', 'parties']):
+        doc_type = "Contract"
+    elif any(word in text.lower() for word in ['complaint', 'plaintiff', 'defendant']):
+        doc_type = "Legal Pleading"
     
     return {
-        "summary": f"This document contains {word_count} words. It appears to be a legal document with standard contractual language.",
-        "key_terms": ["agreement", "party", "obligations", "termination", "liability"],
-        "risk_score": 3.2,
-        "compliance_issues": ["Missing force majeure clause", "Unclear termination conditions"],
+        "summary": f"This document contains {word_count} words across {len(sentences)} sentences. Most frequent terms suggest it is a {doc_type.lower()}.",
+        "key_terms": key_terms[:10],
+        "risk_score": round(risk_score, 1),
+        "compliance_issues": ["Review required - automated compliance check not available"],
         "recommendations": [
-            "Add explicit force majeure provisions",
-            "Clarify payment terms and deadlines",
-            "Review liability limitations"
+            f"Document contains {len(orgs)} organization references",
+            f"Found {len(dates)} date references",
+            "Manual legal review recommended for compliance"
         ],
-        "entities": ["Company A", "Company B", "New York", "2024"],
+        "entities": list(set(orgs[:5] + locations)),
         "sentiment": "neutral",
-        "document_type": "Contract",
-        "confidence": 0.85
+        "document_type": doc_type,
+        "confidence": 0.75
     }
 
 def perform_contract_review(text):
@@ -532,20 +559,45 @@ def perform_contract_review(text):
     }
 
 def extract_key_terms(text):
-    """Extract important legal terms and concepts"""
-    # Mock implementation
-    terms = []
-    legal_keywords = ["shall", "agreement", "party", "obligation", "right", "liability", "termination"]
+    """Extract important legal terms and concepts from actual text"""
+    if not text:
+        return {"summary": "No text to analyze", "key_terms": [], "term_analysis": []}
     
+    from collections import Counter
+    
+    # Extract all meaningful words (length > 3)
+    words = [word.lower().strip('.,!?;:()[]"\'') for word in text.split() if len(word) > 3]
+    word_freq = Counter(words)
+    
+    # Define legal keywords to prioritize
+    legal_keywords = ["shall", "agreement", "party", "parties", "obligation", "right", "liability", 
+                     "termination", "breach", "indemnify", "warranty", "payment", "fee",
+                     "contract", "clause", "provision", "covenant", "entity", "jurisdiction"]
+    
+    # Build term analysis
+    terms = []
     for keyword in legal_keywords:
-        if keyword.lower() in text.lower():
-            count = text.lower().count(keyword.lower())
-            terms.append({"term": keyword, "frequency": count, "importance": "high"})
+        count = word_freq.get(keyword, 0)
+        if count > 0:
+            terms.append({
+                "term": keyword,
+                "frequency": count,
+                "importance": "high" if count > 3 else "medium"
+            })
+    
+    # Add other frequent terms not in legal keywords
+    for word, count in word_freq.most_common(15):
+        if word not in legal_keywords and count > 2:
+            terms.append({
+                "term": word,
+                "frequency": count,
+                "importance": "medium" if count > 5 else "low"
+            })
     
     return {
-        "summary": f"Extracted {len(terms)} key legal terms from the document.",
-        "key_terms": [term["term"] for term in terms],
-        "term_analysis": terms,
+        "summary": f"Extracted {len(terms)} key terms from the document. Most frequent: {terms[0]['term'] if terms else 'none'}",
+        "key_terms": [term["term"] for term in terms[:10]],
+        "term_analysis": sorted(terms, key=lambda x: x["frequency"], reverse=True)[:15],
         "most_frequent": max(terms, key=lambda x: x["frequency"]) if terms else None
     }
 
@@ -595,32 +647,51 @@ def summarize_document(text):
     }
 
 def analyze_clauses(text):
-    """Analyze specific contract clauses"""
+    """Analyze specific contract clauses from actual text"""
+    if not text:
+        return {"summary": "No text to analyze", "clauses": []}
+    
+    text_lower = text.lower()
+    
+    # Define clause types and their detection keywords
+    clause_checks = {
+        "Payment Terms": ["payment", "fee", "compensation", "remuneration", "pay"],
+        "Termination": ["termination", "terminate", "end this agreement", "cancel"],
+        "Force Majeure": ["force majeure", "act of god", "beyond control"],
+        "Confidentiality": ["confidential", "non-disclosure", "proprietary"],
+        "Intellectual Property": ["intellectual property", "copyright", "trademark", "ip rights"],
+        "Liability": ["liability", "liable", "indemnify", "indemnification"],
+        "Governing Law": ["governed by", "jurisdiction", "applicable law"],
+        "Dispute Resolution": ["dispute", "arbitration", "mediation", "litigation"]
+    }
+    
+    clauses = []
+    for clause_name, keywords in clause_checks.items():
+        present = any(keyword in text_lower for keyword in keywords)
+        keyword_count = sum(text_lower.count(kw) for kw in keywords)
+        
+        if present:
+            quality = "Good" if keyword_count > 2 else "Fair" if keyword_count > 0 else "Weak"
+            issues = [] if keyword_count > 2 else ["Limited detail - may need expansion"]
+            suggestions = [] if keyword_count > 2 else [f"Consider adding more detailed {clause_name.lower()} provisions"]
+        else:
+            quality = "Missing"
+            issues = [f"{clause_name} not found in document"]
+            suggestions = [f"Add {clause_name.lower()} clause for completeness"]
+        
+        clauses.append({
+            "name": clause_name,
+            "present": present,
+            "quality": quality,
+            "issues": issues,
+            "suggestions": suggestions
+        })
+    
+    present_count = sum(1 for c in clauses if c["present"])
+    
     return {
-        "summary": "Clause analysis evaluates the presence and quality of standard contract provisions.",
-        "clauses": [
-            {
-                "name": "Payment Terms",
-                "present": True,
-                "quality": "Good",
-                "issues": [],
-                "suggestions": ["Consider adding late payment penalties"]
-            },
-            {
-                "name": "Termination",
-                "present": True,
-                "quality": "Fair",
-                "issues": ["Notice period unclear"],
-                "suggestions": ["Specify exact notice requirements"]
-            },
-            {
-                "name": "Force Majeure",
-                "present": False,
-                "quality": "Missing",
-                "issues": ["No protection against unforeseen events"],
-                "suggestions": ["Add comprehensive force majeure clause"]
-            }
-        ]
+        "summary": f"Found {present_count} of {len(clauses)} standard clauses in the document.",
+        "clauses": clauses
     }
 
 def check_compliance(text):
@@ -777,7 +848,38 @@ def process_batch_documents(batch_files, analysis_type):
                     "risk_score": risk_score,
                     "word_count": len(text.split())
                 })
-        
+            elif analysis_type == "Key Terms":
+                    terms_result = extract_key_terms(text)
+                    results_data.append({
+                        "Filename": file.name,
+                        "Terms Found": len(terms_result.get("key_terms", [])),
+                        "Most Frequent": terms_result.get("most_frequent", {}).get("term", "N/A") if terms_result.get("most_frequent") else "N/A",
+                        "Word Count": len(text.split()),
+                        "Status": "✓ Success"
+                })
+                
+            elif analysis_type == "Clause Analysis":
+                clause_result = analyze_clauses(text)
+                clauses = clause_result.get("clauses", [])
+                present_clauses = sum(1 for c in clauses if c.get("present"))
+                results_data.append({
+                    "Filename": file.name,
+                    "Clauses Found": present_clauses,
+                    "Total Checked": len(clauses),
+                    "Completion": f"{round(present_clauses/len(clauses)*100)}%" if clauses else "0%",
+                    "Status": "✓ Success"
+                })
+            
+            elif analysis_type == "Full Analysis":
+                full_result = perform_full_analysis(text)
+                results_data.append({
+                    "Filename": file.name,
+                    "Doc Type": full_result.get("document_type", "Unknown"),
+                    "Risk Score": full_result.get("risk_score", 0),
+                    "Key Terms": len(full_result.get("key_terms", [])),
+                    "Word Count": len(text.split()),
+                    "Status": "✓ Success"
+                })
         progress_bar.progress((i + 1) / len(batch_files))
     
     # Display batch results
@@ -807,11 +909,62 @@ def classify_document(text):
     else:
         return "General Legal Document"
 
-def assess_document_risk(text):
-    """Quick risk assessment for batch processing"""
-    risk_keywords = ["liability", "damages", "breach", "penalty", "indemnity"]
-    risk_count = sum(1 for keyword in risk_keywords if keyword in text.lower())
-    return min(10, risk_count * 2)  # Scale to 0-10
+def assess_legal_risks(text):
+    """Assess potential legal risks based on actual document content"""
+    if not text:
+        return {"summary": "No text to analyze", "risk_score": 0}
+    
+    text_lower = text.lower()
+    
+    # Define risk indicators
+    high_risk_indicators = {
+        "unlimited liability": ["unlimited", "liability", "without limit"],
+        "unclear termination": ["may terminate" if "may terminate" in text_lower and "notice" not in text_lower else ""],
+        "missing IP protection": [] if any(term in text_lower for term in ["intellectual property", "ip rights", "copyright"]) else ["no IP protection"]
+    }
+    
+    medium_risk_indicators = {
+        "payment ambiguity": [] if "payment" in text_lower and any(t in text_lower for t in ["date", "within", "days"]) else ["payment terms unclear"],
+        "force majeure": [] if "force majeure" in text_lower else ["no force majeure clause"]
+    }
+    
+    low_risk_indicators = {
+        "confidentiality": ["confidential" in text_lower or "non-disclosure" in text_lower],
+        "governing law": ["governed by" in text_lower or "jurisdiction" in text_lower]
+    }
+    
+    # Calculate actual risks
+    high_risk_areas = []
+    for risk, indicators in high_risk_indicators.items():
+        if indicators and indicators[0]:
+            high_risk_areas.append(risk.title())
+    
+    medium_risk_areas = []
+    for risk, indicators in medium_risk_indicators.items():
+        if indicators and indicators[0]:
+            medium_risk_areas.append(risk.title())
+    
+    low_risk_areas = [area.replace("_", " ").title() for area, present in low_risk_indicators.items() if present]
+    
+    # Calculate risk score
+    risk_keywords = ['liability', 'penalty', 'breach', 'damages', 'indemnify', 'lawsuit', 'litigation']
+    risk_count = sum(3 for kw in risk_keywords if kw in text_lower)
+    protection_keywords = ['limit', 'cap', 'maximum', 'insurance', 'indemnification']
+    protection_count = sum(1 for kw in protection_keywords if kw in text_lower)
+    risk_score = max(0, min(10, risk_count - protection_count))
+    
+    return {
+        "summary": f"Risk assessment identified {len(high_risk_areas)} high-risk and {len(medium_risk_areas)} medium-risk areas.",
+        "risk_score": round(risk_score, 1),
+        "high_risk_areas": high_risk_areas if high_risk_areas else ["No critical risks detected"],
+        "medium_risk_areas": medium_risk_areas if medium_risk_areas else ["No medium risks detected"],
+        "low_risk_areas": low_risk_areas if low_risk_areas else ["Standard provisions present"],
+        "recommendations": [
+            f"Address {len(high_risk_areas)} high-priority risk areas" if high_risk_areas else "Continue monitoring for risks",
+            "Consider professional legal review for comprehensive assessment",
+            "Ensure all critical clauses are present and detailed"
+        ]
+    }
 
 def save_analysis_results(results, filename):
     """Save analysis results to session state"""
