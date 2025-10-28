@@ -350,7 +350,7 @@ def show_dashboard_stats(auth_service, org_code):
             reverse=True
         )[:10]
         
-        for idx, doc in recent_docs:
+        for idx, doc in enumerate(recent_docs):
             doc_name = getattr(doc, 'name', 'Unknown Document')
             doc_status = getattr(doc, 'status', 'unknown')
             doc_size = getattr(doc, 'size', 'Unknown size')
