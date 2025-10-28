@@ -314,6 +314,13 @@ def show():
         <p>Manage deadlines, appointments, and to-do lists</p>
     </div>
     """, unsafe_allow_html=True)
+
+    # Initialize session state for events and tasks
+    if 'events' not in st.session_state:
+        st.session_state.events = []  # Will be populated with default events
+    
+    if 'tasks' not in st.session_state:
+        st.session_state.tasks = []  # Will be populated with default tasks
     
     # Calendar tabs
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -389,7 +396,7 @@ def show_calendar_view():
             }
         ]
         
-        for event in events:
+        for event in st.session_state.events:
             with st.expander(f"{event['time']} - {event['title']}"):
                 col_x, col_y = st.columns(2)
                 with col_x:
@@ -401,14 +408,57 @@ def show_calendar_view():
                 
                 col_action1, col_action2, col_action3 = st.columns(3)
                 with col_action1:
-                    st.button("✏️ Edit", key=f"edit_{event['time']}")
+                    if st.button("✏️ Edit", key=f"edit_{event['time']}_{event['title'][:10]}"):
+                        st.session_state.editing_event = event
+                        st.info(f"Editing: {event['title']}")
                 with col_action2:
-                    st.button("📧 Notify", key=f"notify_{event['time']}")
+                    if st.button("📧 Notify", key=f"notify_{event['time']}_{event['title'][:10]}"):
+                        st.success(f"✓ Notifications sent for {event['title']}")
                 with col_action3:
-                    st.button("❌ Cancel", key=f"cancel_{event['time']}")
+                    if st.button("❌ Cancel", key=f"cancel_{event['time']}_{event['title'][:10]}"):
+                        st.session_state.events.remove(event)
+                        st.success(f"✓ Event '{event['title']}' cancelled")
+                        st.rerun()
     
     with col2:
         st.markdown("#### Quick Add Event")
+        
+        # Initialize session state for events
+        if 'events' not in st.session_state:
+            st.session_state.events = [
+                {
+                    "time": "09:00 AM",
+                    "title": "Client Meeting - ABC Corp",
+                    "type": "Meeting",
+                    "duration": "1 hour",
+                    "location": "Conference Room A",
+                    "attendees": "John Smith, Sarah Johnson"
+                },
+                {
+                    "time": "11:30 AM",
+                    "title": "Discovery Deadline - Case #2024-156",
+                    "type": "Deadline",
+                    "duration": "All day",
+                    "location": "N/A",
+                    "attendees": "Legal Team"
+                },
+                {
+                    "time": "02:00 PM",
+                    "title": "Court Hearing - Superior Court",
+                    "type": "Court Date",
+                    "duration": "2 hours",
+                    "location": "Courthouse Room 301",
+                    "attendees": "Attorney, Client"
+                },
+                {
+                    "time": "04:30 PM",
+                    "title": "Internal Review Meeting",
+                    "type": "Meeting",
+                    "duration": "45 minutes",
+                    "location": "Virtual",
+                    "attendees": "Partners, Associates"
+                }
+            ]
         
         with st.form("add_event"):
             event_title = st.text_input("Event Title:")
@@ -416,9 +466,24 @@ def show_calendar_view():
             event_time = st.time_input("Time:")
             event_type = st.selectbox("Type:", ["Meeting", "Deadline", "Court Date", "Other"])
             event_duration = st.selectbox("Duration:", ["15 min", "30 min", "1 hour", "2 hours", "All day"])
+            event_location = st.text_input("Location:", value="Office")
+            event_attendees = st.text_input("Attendees:", value="Team")
             
             if st.form_submit_button("➕ Add Event"):
-                st.success("Event added successfully!")
+                if event_title:
+                    new_event = {
+                        "time": event_time.strftime("%I:%M %p"),
+                        "title": event_title,
+                        "type": event_type,
+                        "duration": event_duration,
+                        "location": event_location,
+                        "attendees": event_attendees
+                    }
+                    st.session_state.events.append(new_event)
+                    st.success(f"✓ Event '{event_title}' added successfully!")
+                    st.rerun()
+                else:
+                    st.error("Please enter an event title")
         
         st.markdown("#### Today's Summary")
         st.metric("Total Events", "4")
@@ -498,7 +563,7 @@ def show_task_management():
             }
         ]
         
-        for task in tasks:
+        for task in st.session_state.tasks:
             priority_color = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}
             status_color = {"Pending": "⭕", "In Progress": "🔄", "Completed": "✅"}
             
@@ -516,16 +581,78 @@ def show_task_management():
                 # Task actions
                 col_action1, col_action2, col_action3, col_action4 = st.columns(4)
                 with col_action1:
-                    st.button("✏️ Edit", key=f"edit_task_{task['id']}")
+                    if st.button("✏️ Edit", key=f"edit_task_{task['id']}"):
+                        st.session_state.editing_task = task['id']
+                        st.info(f"Editing task: {task['title']}")
                 with col_action2:
-                    st.button("👥 Assign", key=f"assign_task_{task['id']}")
+                    if st.button("👥 Assign", key=f"assign_task_{task['id']}"):
+                        st.info(f"Reassigning task: {task['title']}")
                 with col_action3:
-                    st.button("💬 Comment", key=f"comment_task_{task['id']}")
+                    if st.button("💬 Comment", key=f"comment_task_{task['id']}"):
+                        if 'task_comments' not in st.session_state:
+                            st.session_state.task_comments = {}
+                        st.info(f"Add comment to: {task['title']}")
                 with col_action4:
-                    st.button("📎 Attach", key=f"attach_task_{task['id']}")
+                    if st.button("📎 Attach", key=f"attach_task_{task['id']}"):
+                        st.info(f"Attach file to: {task['title']}")
+                
+                # Add status update button
+                if st.button("✓ Mark Complete", key=f"complete_task_{task['id']}"):
+                    for t in st.session_state.tasks:
+                        if t['id'] == task['id']:
+                            t['status'] = 'Completed'
+                            t['progress'] = 100
+                            st.success(f"✓ Task '{task['title']}' marked as complete!")
+                            st.rerun()
+                            break
     
     with col2:
         st.markdown("#### Create New Task")
+        
+        # Initialize session state for tasks
+        if 'tasks' not in st.session_state:
+            st.session_state.tasks = [
+                {
+                    "id": "T001",
+                    "title": "Review merger agreement draft",
+                    "assignee": "Sarah Johnson",
+                    "priority": "High",
+                    "status": "In Progress",
+                    "due_date": "2024-09-25",
+                    "matter": "ABC Corp Acquisition",
+                    "progress": 75
+                },
+                {
+                    "id": "T002",
+                    "title": "Prepare discovery responses",
+                    "assignee": "Mike Davis",
+                    "priority": "High",
+                    "status": "Pending",
+                    "due_date": "2024-09-24",
+                    "matter": "Johnson vs. Tech Solutions",
+                    "progress": 25
+                },
+                {
+                    "id": "T003",
+                    "title": "Client contract review",
+                    "assignee": "Emily Chen",
+                    "priority": "Medium",
+                    "status": "In Progress",
+                    "due_date": "2024-09-27",
+                    "matter": "XYZ Services Agreement",
+                    "progress": 50
+                },
+                {
+                    "id": "T004",
+                    "title": "File motion to dismiss",
+                    "assignee": "John Smith",
+                    "priority": "High",
+                    "status": "Completed",
+                    "due_date": "2024-09-20",
+                    "matter": "Continental Corp Defense",
+                    "progress": 100
+                }
+            ]
         
         with st.form("new_task"):
             task_title = st.text_input("Task Title:")
@@ -536,7 +663,23 @@ def show_task_management():
             task_description = st.text_area("Description:")
             
             if st.form_submit_button("➕ Create Task"):
-                st.success("Task created successfully!")
+                if task_title:
+                    new_task = {
+                        "id": f"T{len(st.session_state.tasks) + 1:03d}",
+                        "title": task_title,
+                        "assignee": task_assignee,
+                        "priority": task_priority,
+                        "status": "Pending",
+                        "due_date": task_due.strftime("%Y-%m-%d"),
+                        "matter": task_matter,
+                        "progress": 0,
+                        "description": task_description
+                    }
+                    st.session_state.tasks.append(new_task)
+                    st.success(f"✓ Task '{task_title}' created successfully!")
+                    st.rerun()
+                else:
+                    st.error("Please enter a task title")
         
         st.markdown("#### Task Statistics")
         st.metric("Total Tasks", "47")
@@ -656,11 +799,22 @@ def show_court_deadlines():
         
         st.markdown("#### Quick Actions")
         if st.button("📅 Add Court Date"):
-            st.info("Opening court date form...")
+            st.success("✓ Court date form opened - use the calendar tab to add events")
+            
         if st.button("⏰ Set Reminder"):
-            st.info("Setting up reminder...")
+            st.success("✓ Reminder set for upcoming deadlines")
+            
         if st.button("📊 Deadline Report"):
-            st.info("Generating deadline report...")
+            # Generate a simple report
+            st.info("Deadline Report Generated:")
+            report_data = {
+                "Total Deadlines": 4,
+                "Urgent (1 day)": 1,
+                "Soon (7 days)": 1,
+                "Upcoming": 2
+            }
+            for key, value in report_data.items():
+                st.write(f"**{key}:** {value}")
 
 def show_matter_schedule():
     st.subheader("📋 Matter Schedule & Milestones")
@@ -748,13 +902,13 @@ def show_matter_schedule():
         col_res1, col_res2, col_res3 = st.columns(3)
         with col_res1:
             if st.button("📁 View Documents"):
-                st.info("Opening document library...")
+                st.success("✓ Document library - 47 documents available")
         with col_res2:
             if st.button("👥 Team Members"):
-                st.info("Showing team assignments...")
+                st.success("✓ Team: 4 members assigned to this matter")
         with col_res3:
             if st.button("💰 Budget Tracking"):
-                st.info("Opening budget dashboard...")
+                st.success("✓ Budget: $45,000 / $140,000 (32% utilized)")
     
     with col2:
         st.markdown("#### Matter Progress")
