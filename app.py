@@ -142,6 +142,7 @@ def main():
         auth_service.show_login()
         
         # ADD FORGOT PASSWORD SECTION HERE - This goes AFTER show_login()
+        # ADD FORGOT PASSWORD SECTION HERE - This goes AFTER show_login()
         st.markdown("<br>", unsafe_allow_html=True)
         
         # Center the forgot password button
@@ -155,9 +156,20 @@ def main():
             
             # Show Forgot Password Form if button was clicked
             if st.session_state.get('show_forgot_password', False):
+                # AUTO-SCROLL JAVASCRIPT - ADD THIS
+                st.markdown("""
+                <script>
+                    setTimeout(function() {
+                        window.scrollTo({
+                            top: document.body.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }, 100);
+                </script>
+                """, unsafe_allow_html=True)
+                
                 st.markdown("---")
                 st.markdown("### 🔐 Reset Your Password")
-                st.write("Enter your email address and we'll send you a reset link.")
                 
                 with st.form("main_forgot_password_form", clear_on_submit=True):
                     reset_email = st.text_input(
