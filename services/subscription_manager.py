@@ -464,6 +464,48 @@ class EnhancedAuthService:
                 if st.button("🔑 Already have an account? Login", use_container_width=True):
                     st.session_state.show_signup_form = False
                     st.rerun()
+
+
+    def _handle_forgot_password(self, email):
+        """Handle forgot password request"""
+        try:
+            from services.email_service import EmailService, AuthTokenManager
+            
+            # Check if user exists (get users from session state)
+            users = st.session_state.get('users', {})
+            
+            if email in users:
+                # Generate reset token
+                reset_token = AuthTokenManager.create_reset_token(email)
+                
+                # Send reset email
+                email_service = EmailService()
+                email_sent = email_service.send_password_reset_email(email, reset_token)
+                
+                if email_sent:
+                    st.success(f"""
+                    ✅ Password reset link sent!
+                    
+                    Check your email at **{email}** for the reset link.
+                    
+                    The link expires in 1 hour.
+                    """)
+                    st.session_state.show_forgot_password = False
+                else:
+                    st.warning("Unable to send email. Please contact support.")
+            else:
+                # Don't reveal if email exists (security best practice)
+                st.success(f"""
+                ✅ Password reset link sent!
+                
+                If an account exists for **{email}**, you'll receive a reset email shortly.
+                
+                The link expires in 1 hour.
+                """)
+                st.session_state.show_forgot_password = False
+        
+        except Exception as e:
+            st.error(f"Error sending reset email: {str(e)}")
     
     def render_sidebar(self):
         """Render sidebar with subscription info"""
