@@ -142,34 +142,16 @@ def main():
         auth_service.show_login()
         
         # ADD FORGOT PASSWORD SECTION HERE - This goes AFTER show_login()
-        # ADD FORGOT PASSWORD SECTION HERE - This goes AFTER show_login()
         st.markdown("<br>", unsafe_allow_html=True)
         
         # Center the forgot password button
         col1, col2, col3 = st.columns([1, 2, 1])
         
         with col2:
-            # Forgot Password Button
-            if st.button("🔑 Forgot Password?", use_container_width=True, key="main_forgot_btn"):
-                st.session_state.show_forgot_password = True
-                st.rerun()
-            
-            # Show Forgot Password Form if button was clicked
-            if st.session_state.get('show_forgot_password', False):
-                # AUTO-SCROLL JAVASCRIPT - ADD THIS
-                st.markdown("""
-                <script>
-                    setTimeout(function() {
-                        window.scrollTo({
-                            top: document.body.scrollHeight,
-                            behavior: 'smooth'
-                        });
-                    }, 100);
-                </script>
-                """, unsafe_allow_html=True)
-                
-                st.markdown("---")
+            # Use expander - automatically scrolls when opened
+            with st.expander("🔑 Forgot Password? Click here to reset"):
                 st.markdown("### 🔐 Reset Your Password")
+                st.write("Enter your email address and we'll send you a reset link.")
                 
                 with st.form("main_forgot_password_form", clear_on_submit=True):
                     reset_email = st.text_input(
@@ -194,53 +176,28 @@ def main():
                         )
                     
                     if cancel_reset:
-                        st.session_state.show_forgot_password = False
                         st.rerun()
                     
                     if submit_reset:
                         if not reset_email or '@' not in reset_email:
                             st.error("❌ Please enter a valid email address")
                         else:
-                            # Import email service
                             from services.email_service import EmailService, AuthTokenManager
-                            
                             try:
-                                # Get users from session state
                                 users = st.session_state.get('users', {})
-                                
                                 if reset_email in users:
-                                    # Generate reset token
                                     reset_token = AuthTokenManager.create_reset_token(reset_email)
-                                    
-                                    # Send reset email
                                     email_service = EmailService()
                                     email_sent = email_service.send_password_reset_email(reset_email, reset_token)
-                                    
                                     if email_sent:
-                                        st.success(f"""
-                                        ✅ **Password reset link sent!**
-                                        
-                                        Check your email at **{reset_email}** for the reset link.
-                                        
-                                        The link will expire in 1 hour.
-                                        """)
-                                        st.session_state.show_forgot_password = False
+                                        st.success(f"✅ **Password reset link sent!** Check your email at **{reset_email}**")
                                         st.balloons()
                                     else:
-                                        st.warning("⚠️ Unable to send email. Please try again later or contact support.")
+                                        st.warning("⚠️ Unable to send email. Please try again later.")
                                 else:
-                                    # Security: Don't reveal if email exists or not
-                                    st.success(f"""
-                                    ✅ **Password reset link sent!**
-                                    
-                                    If an account exists for **{reset_email}**, you'll receive a reset email shortly.
-                                    
-                                    The link will expire in 1 hour.
-                                    """)
-                                    st.session_state.show_forgot_password = False
-                            
+                                    st.success("✅ If an account exists, you'll receive a reset email.")
                             except Exception as e:
-                                st.error(f"❌ Error sending reset email: {str(e)}")
+                                st.error(f"❌ Error: {str(e)}")
                                 
                                 # Show debug info in expander
                                 with st.expander("🔧 Debug Information"):
