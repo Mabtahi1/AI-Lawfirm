@@ -4,21 +4,34 @@ import pandas as pd
 def show():
     """Display the case comparison page"""
     
-    # Get user's organization
+    def show():
+    """Display the case comparison page"""
+    
+    # Get user's organization - provide fallback
     user_data = st.session_state.get('user_data', {})
-    org_code = user_data.get('organization_code')
+    user_email = user_data.get('email', 'demo@example.com')
+    org_code = user_data.get('organization_code', user_email)
     
-    if not org_code:
-        st.error("Please log in to access this feature")
-        return
+    # If no user data at all, create a default one
+    if not user_data:
+        st.session_state.user_data = {
+            'email': 'demo@example.com',
+            'name': 'Demo User',
+            'organization_code': 'demo_org'
+        }
+        user_data = st.session_state.user_data
+        org_code = 'demo_org'
     
-    # Import subscription manager
+    # Import subscription manager - make it optional
     try:
         from services.subscription_manager import SubscriptionManager
         subscription_manager = SubscriptionManager()
+        has_subscription = True
     except Exception as e:
-        st.error(f"Subscription service unavailable: {e}")
-        return
+        # If subscription service unavailable, continue without it
+        subscription_manager = None
+        has_subscription = False
+        st.warning("⚠️ Running in demo mode - subscription features disabled")
     
     # Professional header styling
     st.markdown("""
@@ -258,17 +271,23 @@ def show():
     </div>
     """, unsafe_allow_html=True)
     
-    # Get subscription details
-    subscription = subscription_manager.get_organization_subscription(org_code)
-    plan_name = subscription.get('plan', 'basic')
-    
-    # Enterprise users always have access
-    if plan_name == 'enterprise':
-        can_use = True
-        status = "Unlimited ✨"
+    # Get subscription details - handle case where subscription manager doesn't exist
+    if has_subscription and subscription_manager:
+        subscription = subscription_manager.get_organization_subscription(org_code)
+        plan_name = subscription.get('plan', 'basic')
+        
+        # Enterprise users always have access
+        if plan_name == 'enterprise':
+            can_use = True
+            status = "Unlimited ✨"
+        else:
+            can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'case_comparison')
     else:
-        can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'case_comparison')
-    
+        # Demo mode - allow unlimited access
+        plan_name = 'demo'
+        can_use = True
+        status = "Demo Mode"
+        
     # Show usage status
     col_status1, col_status2, col_status3 = st.columns(3)
     
@@ -276,14 +295,17 @@ def show():
         st.metric("Plan", plan_name.title())
     
     with col_status2:
-        if plan_name == 'professional':
-            usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
-            limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
-            st.metric("Usage This Month", f"{usage}/{limit}")
-        elif plan_name == 'enterprise':
-            st.metric("Usage", "Unlimited ✨")
+        if has_subscription and subscription_manager:
+            if plan_name == 'professional':
+                usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
+                limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
+                st.metric("Usage This Month", f"{usage}/{limit}")
+            elif plan_name == 'enterprise':
+                st.metric("Usage", "Unlimited ✨")
+            else:
+                st.metric("Usage", "Not Available")
         else:
-            st.metric("Usage", "Not Available")
+            st.metric("Usage", "Demo - Unlimited")
     
     with col_status3:
         if not can_use and plan_name == 'basic':
@@ -501,23 +523,26 @@ def show_new_case_comparison(subscription_manager, org_code, plan_name):
                 import time
                 time.sleep(2)
                 
-                # Increment usage counter ONLY for non-enterprise users
-                if plan_name != 'enterprise':
+                # Increment usage counter ONLY for non-enterprise users and when subscription exists
+                if has_subscription and subscription_manager and plan_name != 'enterprise':
                     subscription_manager.increment_feature_usage(org_code, 'case_comparison')
             
             st.success("✅ Analysis complete!")
             
             # Show updated usage (only for non-enterprise)
-            if plan_name == 'professional':
-                usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
-                limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
-                remaining = limit - usage
-                if remaining > 0:
-                    st.info(f"📊 You have {remaining} comparisons remaining this month")
-                else:
-                    st.warning("⚠️ You've reached your monthly limit")
-            elif plan_name == 'enterprise':
-                st.success("✨ Unlimited comparisons available")
+            if has_subscription and subscription_manager:
+                if plan_name == 'professional':
+                    usage = subscription_manager.get_feature_usage(org_code, 'case_comparison')
+                    limit = subscription_manager.get_feature_limit(org_code, 'case_comparison')
+                    remaining = limit - usage
+                    if remaining > 0:
+                        st.info(f"📊 You have {remaining} comparisons remaining this month")
+                    else:
+                        st.warning("⚠️ You've reached your monthly limit")
+                elif plan_name == 'enterprise':
+                    st.success("✨ Unlimited comparisons available")
+            else:
+                st.success("✨ Demo mode - Unlimited comparisons")
             
             # Display mock results
             st.markdown("---")
