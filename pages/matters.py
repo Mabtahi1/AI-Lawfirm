@@ -25,7 +25,7 @@ def set_attr(item, attr, value):
     else:
         setattr(item, attr, value)
 
-class Type(Enum):
+class MatterType(Enum):
     LITIGATION = "litigation"
     CORPORATE = "corporate"
     REAL_ESTATE = "real_estate"
@@ -39,7 +39,7 @@ class Type(Enum):
     CONTRACT = "contract"
     MERGERS_ACQUISITIONS = "mergers_acquisitions"
 
-class Status(Enum):
+class MatterStatus(Enum):
     ACTIVE = "active"
     ON_HOLD = "on_hold"
     CLOSED = "closed"
@@ -90,7 +90,7 @@ class Expense:
     receipt_attached: bool = False
 
 @dataclass
-class :
+class Matter:
     id: str = ""
     name: str = ""
     client_id: str = ""
@@ -144,7 +144,7 @@ def create_new_user():
         return
 
 
-def initialize__session_state():
+def initialize_matter_session_state():
     """Initialize matter-related session state"""
     if 'matters' not in st.session_state:
         st.session_state.matters = []
@@ -226,7 +226,10 @@ def show():
                        for entry in st.session_state.time_entries]
     else:
         time_entries = []
-    
+        
+    if 'show_create_matter_form' not in st.session_state:
+        st.session_state.show_create_matter_form = False
+        
     # Now use time_entries with getattr() since they're SimpleNamespace objects
     total_unbilled_hours = sum(
         getattr(entry, 'hours', 0) for entry in time_entries 
@@ -572,10 +575,20 @@ def _show_matter_dashboard(auth_service):
     
     st.divider()
     
-    # Create new matter
-    if auth_service.has_permission('write'):
-        _show_create_matter_form(auth_service)
-        st.divider()
+    # Quick action button to create matter
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    with col_btn2:
+        if st.button("➕ Create New Matter", type="primary", use_container_width=True):
+            st.session_state['show_create_matter_form'] = True
+            st.rerun()
+    
+    st.divider()
+
+    # Create new matter form (show if button clicked)
+    if st.session_state.get('show_create_matter_form', False):
+        if auth_service.has_permission('write'):
+            _show_create_matter_form(auth_service)
+            st.divider()
     
     # Matter filters and search
     _show_matter_filters()
@@ -631,7 +644,14 @@ def _show_matter_statistics():
 
 def _show_create_matter_form(auth_service):
     """Enhanced matter creation form"""
-    st.subheader("➕ Create New Matter")
+    # ADD HEADER WITH CLOSE BUTTON:
+    col_header1, col_header2 = st.columns([4, 1])
+    with col_header1:
+        st.subheader("➕ Create New Matter")
+    with col_header2:
+        if st.button("✖️ Close", key="close_create_form"):
+            st.session_state.show_create_matter_form = False
+            st.rerun()
     
     with st.form("new_matter_form"):
         col1, col2 = st.columns(2)
@@ -684,11 +704,17 @@ def _show_create_matter_form(auth_service):
                 )
                 
                 st.session_state.matters.append(new_matter)
+                st.session_state['show_create_matter_form'] = False  # ✅ ADD THIS
                 st.success(f"✅ Matter '{matter_name}' created successfully!")
                 time.sleep(1)
                 st.rerun()
             else:
                 st.error("❌ Please fill in all required fields.")
+        
+        # ADD CANCEL BUTTON:
+        if st.form_submit_button("❌ Cancel"):
+            st.session_state['show_create_matter_form'] = False
+            st.rerun()
 
 def _show_matter_filters():
     """Matter filtering interface"""
@@ -1734,29 +1760,41 @@ def _show_matter_editor(matter):
             st.rerun()
 
 def _show_status_update_modal(matter):
-    """Show status update interface"""
-    matter_name = get_attr(matter, 'name', 'Unknown')
-    matter_status = get_attr(matter, 'status', 'active')
+     """Show status update interface"""
+     matter_name = get_attr(matter, 'name', 'Unknown')
+     matter_status = get_attr(matter, 'status', 'active')
+     matter_id = get_attr(matter, 'id')
     
-    st.subheader(f"🔄 Update Status: {matter_name}")
+     st.markdown("---")
+     st.subheader(f"🔄 Update Status: {matter_name}")
     
-    try:
-        status_index = list(MatterStatus).index(MatterStatus(matter_status))
-    except:
-        status_index = 0
-    
-    new_status = st.selectbox("New Status", 
-                            [s.value.title() for s in MatterStatus],
-                            index=status_index)
-    
-    if st.button("Update Status"):
-        set_attr(matter, 'status', new_status.lower())
-        if new_status.lower() == 'closed':
-            set_attr(matter, 'closed_date', datetime.now())
+     # Create a form for status update
+     with st.form(f"status_update_form_{matter_id}"):
+         try:
+             status_index = list(MatterStatus).index(MatterStatus(matter_status))
+         except:
+             status_index = 0
         
-        st.success(f"Status updated to {new_status}")
-        time.sleep(1)
-        st.rerun()
+         new_status = st.selectbox("New Status", 
+                                 [s.value.title() for s in MatterStatus],
+                                 index=status_index,
+                                 key=f"status_select_{matter_id}")
+        
+         col1, col2 = st.columns(2)
+        
+         with col1:
+             if st.form_submit_button("✅ Update Status", type="primary"):
+                 set_attr(matter, 'status', new_status.lower())
+                 if new_status.lower() == 'closed':
+                     set_attr(matter, 'closed_date', datetime.now())
+                
+                 st.success(f"Status updated to {new_status}")
+                 time.sleep(1)
+                 st.rerun()
+        
+         with col2:
+             if st.form_submit_button("❌ Cancel"):
+                 st.rerun()
 
 def _show_matter_tasks(matter_id):
     """Show tasks for a specific matter"""
