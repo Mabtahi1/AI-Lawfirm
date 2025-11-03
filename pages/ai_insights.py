@@ -421,41 +421,80 @@ def extract_document_text(uploaded_file):
 def extract_text_from_pdf(uploaded_file):
     """Extract text from PDF files"""
     try:
+        # Reset file pointer to beginning
+        uploaded_file.seek(0)
         pdf_reader = PyPDF2.PdfReader(uploaded_file)
         text = ""
         for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+        
+        if not text.strip():
+            return "PDF contains no extractable text. It may be scanned or image-based."
+        
         return text
     except Exception as e:
         st.error(f"Error reading PDF: {str(e)}")
         return None
 
 def extract_text_from_docx(uploaded_file):
-    """Extract text from Word s"""
+    """Extract text from Word documents"""
     try:
-        doc = docx.(uploaded_file)
+        # Reset file pointer to beginning
+        uploaded_file.seek(0)
+        doc = docx.Document(uploaded_file)  # ✅ Fixed: Added 'Document'
         text = ""
         for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
+            if paragraph.text.strip():
+                text += paragraph.text + "\n"
+        
+        # Also extract text from tables if present
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    if cell.text.strip():
+                        text += cell.text + " "
+                text += "\n"
+        
+        if not text.strip():
+            return "Word document contains no text."
+        
         return text
     except Exception as e:
-        st.error(f"Error reading Word : {str(e)}")
+        st.error(f"Error reading Word document: {str(e)}")
+        st.info("Make sure python-docx is installed: pip install python-docx")
         return None
 
 def extract_text_from_image(uploaded_file):
     """Extract text from images using OCR"""
     try:
+        # Reset file pointer to beginning
+        uploaded_file.seek(0)
         image = Image.open(uploaded_file)
+        
         # Convert to RGB if necessary
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
         # Perform OCR
         text = pytesseract.image_to_string(image, lang='eng')
+        
+        if not text.strip():
+            return "No text detected in image. Image may be too low quality or contain no text."
+        
         return text
+    except pytesseract.TesseractNotFoundError:
+        st.error("Tesseract OCR is not installed on your system")
+        st.info("""
+        To install Tesseract:
+        - **Windows**: Download from https://github.com/UB-Mannheim/tesseract/wiki
+        - **Mac**: `brew install tesseract`
+        - **Linux**: `sudo apt-get install tesseract-ocr`
+        """)
+        return None
     except Exception as e:
         st.error(f"Error performing OCR: {str(e)}")
-        st.info("Make sure Tesseract is installed on your system")
         return None
 
 def perform__analysis(text, analysis_type):
