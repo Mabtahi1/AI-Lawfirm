@@ -25,7 +25,7 @@ def set_attr(item, attr, value):
     else:
         setattr(item, attr, value)
 
-class MatterType(Enum):
+class Type(Enum):
     LITIGATION = "litigation"
     CORPORATE = "corporate"
     REAL_ESTATE = "real_estate"
@@ -39,7 +39,7 @@ class MatterType(Enum):
     CONTRACT = "contract"
     MERGERS_ACQUISITIONS = "mergers_acquisitions"
 
-class MatterStatus(Enum):
+class Status(Enum):
     ACTIVE = "active"
     ON_HOLD = "on_hold"
     CLOSED = "closed"
@@ -55,7 +55,7 @@ class Priority(Enum):
 @dataclass
 class Task:
     id: str = ""
-    matter_id: str = ""
+    _id: str = ""
     title: str = ""
     description: str = ""
     assigned_to: str = ""
@@ -70,7 +70,7 @@ class Task:
 @dataclass
 class TimeEntry:
     id: str = ""
-    matter_id: str = ""
+    _id: str = ""
     attorney_email: str = ""
     date: datetime = field(default_factory=datetime.now)
     hours: float = 0.0
@@ -79,9 +79,9 @@ class TimeEntry:
     task_id: Optional[str] = None
 
 @dataclass
-class MatterExpense:
+class Expense:
     id: str = ""
-    matter_id: str = ""
+    _id: str = ""
     date: datetime = field(default_factory=datetime.now)
     amount: float = 0.0
     description: str = ""
@@ -90,12 +90,12 @@ class MatterExpense:
     receipt_attached: bool = False
 
 @dataclass
-class Matter:
+class :
     id: str = ""
     name: str = ""
     client_id: str = ""
     client_name: str = ""
-    matter_type: str = ""
+    _type: str = ""
     status: str = ""
     created_date: datetime = field(default_factory=datetime.now)
     assigned_attorneys: List[str] = field(default_factory=list)
@@ -144,7 +144,7 @@ def create_new_user():
         return
 
 
-def initialize_matter_session_state():
+def initialize__session_state():
     """Initialize matter-related session state"""
     if 'matters' not in st.session_state:
         st.session_state.matters = []
@@ -157,6 +157,9 @@ def initialize_matter_session_state():
     
     if 'matter_expenses' not in st.session_state:
         st.session_state.matter_expenses = []
+    
+    if 'documents' not in st.session_state:
+        st.session_state.documents = []    
     
     # Sample data for demo
     if not st.session_state.matters:
@@ -823,8 +826,14 @@ def _show_matter_card(matter, auth_service):
     matter_tags = get_attr(matter, 'tags', [])
     matter_assigned_attorneys = get_attr(matter, 'assigned_attorneys', [])
     
-    matter_docs = [doc for doc in st.session_state.get('documents', []) 
-                   if hasattr(doc, 'matter_id') and doc.matter_id == matter_id]
+    # Get documents for this matter - handle both dict and object formats
+    matter_docs = []
+    for doc in st.session_state.get('documents', []):
+        if isinstance(doc, dict):
+            if doc.get('matter_id') == matter_id:
+                matter_docs.append(doc)
+        elif hasattr(doc, 'matter_id') and doc.matter_id == matter_id:
+            matter_docs.append(doc)
     
     # Check if overdue
     is_overdue = matter_deadline and matter_deadline < datetime.now() and matter_status == 'active'
@@ -870,16 +879,118 @@ def _show_matter_card(matter, auth_service):
         if matter_assigned_attorneys:
             st.markdown(f"**👥 Attorneys:** {', '.join(matter_assigned_attorneys)}")
         
-        # Recent documents
+        # Recent documents - handle both dict and object formats
         if matter_docs:
             st.markdown("**📂 Recent Documents:**")
             for doc in matter_docs[-3:]:
-                doc_name = getattr(doc, 'name', 'Unknown Document')
-                doc_type = getattr(doc, 'document_type', getattr(doc, 'type', 'Unknown'))
-                doc_status = getattr(doc, 'status', 'unknown')
+                if isinstance(doc, dict):
+                    doc_name = doc.get('name', 'Unknown Document')
+                    doc_type = doc.get('document_type', doc.get('type', 'Unknown'))
+                    doc_status = doc.get('status', 'Active')
+                    doc_upload_date = doc.get('upload_date', 'N/A')
+                else:
+                    doc_name = getattr(doc, 'name', 'Unknown Document')
+                    doc_type = getattr(doc, 'document_type', getattr(doc, 'type', 'Unknown'))
+                    doc_status = getattr(doc, 'status', 'Active')
+                    doc_upload_date = getattr(doc, 'upload_date', 'N/A')
                 
-                status_emoji = {"draft": "✏️", "under_review": "🔍", "final": "✅"}
-                st.markdown(f"• {status_emoji.get(doc_status, '📄')} {doc_name} ({doc_type})")
+                status_emoji = {"Draft": "✏️", "Under Review": "🔍", "Active": "✅", "Final": "✅"}
+                
+                # Create download button for each document
+                col_doc_name, col_doc_action = st.columns([3, 1])
+                with col_doc_name:
+                    st.markdown(f"• {status_emoji.get(doc_status, '📄')} {doc_name} ({doc_type})")
+                with col_doc_action:
+                    if isinstance(doc, dict) and 'content' in doc:
+                        st.download_button(
+                            label="⬇️",
+                            data=doc['content'],
+                            file_name=doc_name,
+                            mime=doc.get('mime_type', 'application/octet-stream'),
+                            key=f"download_{doc.get('id', uuid.uuid4())}"
+                        )
+
+        # Document Upload Section
+        if auth_service.has_permission('write'):
+            st.markdown("---")
+            st.markdown("**📤 Upload Document**")
+            
+            with st.form(f"upload_doc_{matter_id}", clear_on_submit=True):
+                col_upload1, col_upload2 = st.columns(2)
+                
+                with col_upload1:
+                    uploaded_file = st.file_uploader(
+                        "Choose file", 
+                        type=['pdf', 'docx', 'txt', 'xlsx', 'png', 'jpg', 'jpeg'],
+                        key=f"file_upload_{matter_id}"
+                    )
+                    doc_description = st.text_input(
+                        "Document Description", 
+                        placeholder="Brief description of the document",
+                        key=f"doc_desc_{matter_id}"
+                    )
+                
+                with col_upload2:
+                    doc_tags = st.multiselect(
+                        "Tags", 
+                        ["contract", "brief", "correspondence", "discovery", "motion", "evidence", "memo"],
+                        key=f"doc_tags_{matter_id}"
+                    )
+                    doc_security = st.selectbox(
+                        "Security Level", 
+                        ["Standard", "Confidential", "Attorney Work Product", "Privileged"],
+                        key=f"doc_security_{matter_id}"
+                    )
+                
+                if st.form_submit_button("📤 Upload Document"):
+                    if uploaded_file:
+                        # Create document data structure
+                        doc_data = {
+                            'id': str(uuid.uuid4()),
+                            'matter_id': matter_id,
+                            'name': uploaded_file.name,
+                            'size': uploaded_file.size,
+                            'type': uploaded_file.type,
+                            'mime_type': uploaded_file.type,
+                            'upload_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'uploaded_by': st.session_state.get('user_email', 'current@firm.com'),
+                            'content': uploaded_file.read(),
+                            'description': doc_description if doc_description else f"Document for {matter_name}",
+                            'tags': doc_tags,
+                            'security_level': doc_security,
+                            'status': 'Active',
+                            'version': '1.0',
+                            'matter_name': matter_name,
+                            'client_name': matter_client,
+                            'document_type': doc_tags[0] if doc_tags else 'general',
+                            'path': f"/matters/{matter_name.replace(' ', '_').lower()}/documents/",
+                            'pages': 'N/A'  # Could extract from PDF if needed
+                        }
+                        
+                        # Add to documents list in session state
+                        if 'documents' not in st.session_state:
+                            st.session_state.documents = []
+                        
+                        st.session_state.documents.append(doc_data)
+                        
+                        # Also add to matter's documents list
+                        if not hasattr(matter, 'documents'):
+                            if isinstance(matter, dict):
+                                matter['documents'] = []
+                            else:
+                                matter.documents = []
+                        
+                        if isinstance(matter, dict):
+                            matter['documents'].append(doc_data)
+                        else:
+                            matter.documents.append(doc_data)
+                        
+                        st.success(f"✅ Document '{uploaded_file.name}' uploaded successfully!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Please select a file to upload")
+
         
         # Progress bar for budget utilization
         if matter_budget > 0:
