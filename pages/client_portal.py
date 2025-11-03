@@ -3,6 +3,40 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 
+DATA_DIR = "user_data"
+
+def ensure_data_dir():
+    """Ensure data directory exists"""
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+
+def get_user_file(user_email, data_type):
+    """Get file path for user data"""
+    ensure_data_dir()
+    safe_email = user_email.replace('@', '_at_').replace('.', '_')
+    return os.path.join(DATA_DIR, f"{safe_email}_{data_type}.json")
+
+def save_user_data(user_email, data_type, data):
+    """Save user data to file"""
+    file_path = get_user_file(user_email, data_type)
+    with open(file_path, 'w') as f:
+        json.dump(data, f, default=str)
+
+def load_user_data(user_email, data_type, default=None):
+    """Load user data from file"""
+    file_path = get_user_file(user_email, data_type)
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    return default if default is not None else []
+
+def auto_save_client_data():
+    """Automatically save client portal data"""
+    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
+    if 'portal_clients' in st.session_state:
+        save_user_data(user_email, 'portal_clients', st.session_state.portal_clients)
+
+
 def show():
     # Professional header styling
     st.markdown("""
@@ -244,6 +278,13 @@ def show():
     </div>
 
     """, unsafe_allow_html=True)
+
+    # Initialize real client data
+    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
+    
+    if 'portal_clients' not in st.session_state:
+        st.session_state.portal_clients = load_user_data(user_email, 'portal_clients', [])
+    
     
     # Client Portal tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -272,6 +313,76 @@ def show():
 def show_client_access():
     st.subheader("👥 Client Access Management")
     
+    # ADD NEW CLIENT BUTTON AT TOP
+    col_header1, col_header2 = st.columns([3, 1])
+    
+    with col_header2:
+        if st.button("➕ Add New Client", type="primary", use_container_width=True):
+            st.session_state.show_add_client_form = True
+    
+    # ADD CLIENT FORM
+    if st.session_state.get('show_add_client_form', False):
+        with st.form("add_client_form"):
+            st.markdown("### Add New Client Portal User")
+            
+            col_form1, col_form2 = st.columns(2)
+            
+            with col_form1:
+                client_name = st.text_input("Client Name *", placeholder="John Smith")
+                client_email = st.text_input("Email Address *", placeholder="john@company.com")
+                company_name = st.text_input("Company Name", placeholder="ABC Corporation")
+            
+            with col_form2:
+                access_level = st.selectbox("Access Level", ["Full Access", "Limited Access", "View Only"])
+                
+                # Multi-select for matters
+                matters = st.session_state.get('matters', [])
+                if matters:
+                    matter_names = [m.get('name', 'Untitled') if isinstance(m, dict) else getattr(m, 'name', 'Untitled') for m in matters]
+                    selected_matters = st.multiselect("Assign Matters", matter_names)
+                else:
+                    st.info("No matters available. Create matters in Matter Management first.")
+                    selected_matters = []
+                
+                send_invite = st.checkbox("Send invitation email", value=True)
+            
+            col_submit1, col_submit2 = st.columns(2)
+            
+            with col_submit1:
+                if st.form_submit_button("✅ Add Client", type="primary"):
+                    if client_name and client_email:
+                        # Create new client
+                        new_client = {
+                            "id": len(st.session_state.portal_clients) + 1,
+                            "name": client_name,
+                            "company": company_name if company_name else "N/A",
+                            "email": client_email,
+                            "access_level": access_level,
+                            "status": "Pending Setup" if send_invite else "Active",
+                            "last_login": "Never",
+                            "documents_accessed": 0,
+                            "matters": selected_matters,
+                            "permissions": get_permissions_for_access_level(access_level),
+                            "created_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
+                        
+                        st.session_state.portal_clients.append(new_client)
+                        auto_save_client_data()
+                        
+                        st.success(f"✅ Client {client_name} added successfully!")
+                        if send_invite:
+                            st.info(f"📧 Invitation email sent to {client_email}")
+                        
+                        st.session_state.show_add_client_form = False
+                        st.rerun()
+                    else:
+                        st.error("Please fill in required fields (Name and Email)")
+            
+            with col_submit2:
+                if st.form_submit_button("❌ Cancel"):
+                    st.session_state.show_add_client_form = False
+                    st.rerun()
+    
     col1, col2 = st.columns([3, 1])
     
     with col1:
@@ -287,55 +398,39 @@ def show_client_access():
         with col_search3:
             status_filter = st.selectbox("Status:", ["All", "Active", "Inactive", "Pending Setup"])
         
-        # Client access list
-        client_users = [
-            {
-                "name": "John Smith",
-                "company": "ABC Corporation",
-                "email": "john.smith@abccorp.com",
-                "access_level": "Full Access",
-                "status": "Active",
-                "last_login": "2024-09-23 09:30 AM",
-                "documents_accessed": 23,
-                "matters": ["Corporate Restructuring", "Contract Review"],
-                "permissions": ["View Documents", "Download Files", "Submit Requests", "View Billing"]
-            },
-            {
-                "name": "Sarah Johnson",
-                "company": "Tech Solutions Inc",
-                "email": "s.johnson@techsolutions.com",
-                "access_level": "Full Access",
-                "status": "Active",
-                "last_login": "2024-09-22 04:15 PM",
-                "documents_accessed": 18,
-                "matters": ["IP Licensing", "Employment Agreement"],
-                "permissions": ["View Documents", "Download Files", "Submit Requests", "View Billing", "Approve Invoices"]
-            },
-            {
-                "name": "Mike Davis",
-                "company": "Startup Innovations",
-                "email": "mike@startup-innov.com",
-                "access_level": "Limited Access",
-                "status": "Active",
-                "last_login": "2024-09-20 02:45 PM",
-                "documents_accessed": 7,
-                "matters": ["Incorporation Documents"],
-                "permissions": ["View Documents", "Submit Requests"]
-            },
-            {
-                "name": "Emily Chen",
-                "company": "Global Manufacturing",
-                "email": "emily.chen@globalmfg.com",
-                "access_level": "View Only",
-                "status": "Pending Setup",
-                "last_login": "Never",
-                "documents_accessed": 0,
-                "matters": ["Compliance Review"],
-                "permissions": ["View Documents"]
-            }
-        ]
+        # Get client list
+        client_users = st.session_state.portal_clients
         
-        for client in client_users:
+        # APPLY FILTERS
+        filtered_clients = client_users
+        
+        # Search filter
+        if client_search:
+            search_lower = client_search.lower()
+            filtered_clients = [
+                c for c in filtered_clients
+                if search_lower in c.get('name', '').lower() or
+                   search_lower in c.get('email', '').lower() or
+                   search_lower in c.get('company', '').lower()
+            ]
+        
+        # Access level filter
+        if access_filter != "All":
+            filtered_clients = [c for c in filtered_clients if c.get('access_level') == access_filter]
+        
+        # Status filter
+        if status_filter != "All":
+            filtered_clients = [c for c in filtered_clients if c.get('status') == status_filter]
+        
+        # Display message if no clients
+        if not filtered_clients:
+            if not client_users:
+                st.info("📝 No clients yet. Click 'Add New Client' to create your first client portal user.")
+            else:
+                st.info("🔍 No clients match your search criteria.")
+        
+        # Display filtered clients
+        for client in filtered_clients:
             access_color = {
                 "Full Access": "🟢",
                 "Limited Access": "🟡",
@@ -349,63 +444,91 @@ def show_client_access():
                 "Pending Setup": "⏳"
             }
             
-            with st.expander(f"{access_color[client['access_level']]} {client['name']} ({client['company']}) - {status_color[client['status']]} {client['status']}"):
+            with st.expander(f"{access_color.get(client.get('access_level'), '⚪')} {client.get('name', 'Unknown')} ({client.get('company', 'N/A')}) - {status_color.get(client.get('status'), '⭕')} {client.get('status', 'Unknown')}"):
                 col_client1, col_client2, col_client3 = st.columns(3)
                 
                 with col_client1:
-                    st.write(f"**Email:** {client['email']}")
-                    st.write(f"**Access Level:** {client['access_level']}")
-                    st.write(f"**Last Login:** {client['last_login']}")
+                    st.write(f"**Email:** {client.get('email', 'N/A')}")
+                    st.write(f"**Access Level:** {client.get('access_level', 'N/A')}")
+                    st.write(f"**Last Login:** {client.get('last_login', 'Never')}")
                 
                 with col_client2:
-                    st.write(f"**Documents Accessed:** {client['documents_accessed']}")
+                    st.write(f"**Documents Accessed:** {client.get('documents_accessed', 0)}")
                     st.write("**Active Matters:**")
-                    for matter in client['matters']:
-                        st.write(f"• {matter}")
+                    matters = client.get('matters', [])
+                    if matters:
+                        for matter in matters:
+                            st.write(f"• {matter}")
+                    else:
+                        st.write("• No matters assigned")
                 
                 with col_client3:
                     st.write("**Permissions:**")
-                    for permission in client['permissions']:
+                    permissions = client.get('permissions', [])
+                    for permission in permissions:
                         st.write(f"✓ {permission}")
                 
                 # Client management actions
                 col_action1, col_action2, col_action3, col_action4 = st.columns(4)
                 with col_action1:
-                    st.button("⚙️ Edit Access", key=f"edit_{client['email']}")
+                    if st.button("⚙️ Edit Access", key=f"edit_{client.get('id')}"):
+                        st.info("Edit functionality coming soon")
                 with col_action2:
-                    st.button("📧 Send Invite", key=f"invite_{client['email']}")
+                    if st.button("📧 Send Invite", key=f"invite_{client.get('id')}"):
+                        st.success(f"Invitation sent to {client.get('email')}")
                 with col_action3:
-                    st.button("🔒 Reset Password", key=f"reset_{client['email']}")
+                    if st.button("🔒 Reset Password", key=f"reset_{client.get('id')}"):
+                        st.success("Password reset email sent")
                 with col_action4:
-                    if client['status'] == "Active":
-                        st.button("⏸️ Suspend", key=f"suspend_{client['email']}")
+                    if client.get('status') == "Active":
+                        if st.button("⏸️ Suspend", key=f"suspend_{client.get('id')}"):
+                            client['status'] = "Suspended"
+                            auto_save_client_data()
+                            st.warning("Client suspended")
+                            st.rerun()
                     else:
-                        st.button("▶️ Activate", key=f"activate_{client['email']}")
+                        if st.button("▶️ Activate", key=f"activate_{client.get('id')}"):
+                            client['status'] = "Active"
+                            auto_save_client_data()
+                            st.success("Client activated")
+                            st.rerun()
+                
+                # Delete button
+                if st.button("🗑️ Delete Client", key=f"delete_{client.get('id')}"):
+                    st.session_state.portal_clients.remove(client)
+                    auto_save_client_data()
+                    st.success("Client deleted")
+                    st.rerun()
         
         # Bulk operations
-        st.markdown("#### Bulk Operations")
-        
-        col_bulk1, col_bulk2, col_bulk3, col_bulk4 = st.columns(4)
-        with col_bulk1:
-            if st.button("📧 Send Welcome Email"):
-                st.info("Sending welcome emails to new users...")
-        with col_bulk2:
-            if st.button("🔄 Sync Permissions"):
-                st.info("Synchronizing permissions across all users...")
-        with col_bulk3:
-            if st.button("📊 Export User List"):
-                st.info("Exporting client user data...")
-        with col_bulk4:
-            if st.button("⚠️ Security Audit"):
-                st.info("Running security audit on client accounts...")
+        if client_users:
+            st.markdown("#### Bulk Operations")
+            
+            col_bulk1, col_bulk2, col_bulk3, col_bulk4 = st.columns(4)
+            with col_bulk1:
+                if st.button("📧 Send Welcome Email"):
+                    st.info("Sending welcome emails to new users...")
+            with col_bulk2:
+                if st.button("🔄 Sync Permissions"):
+                    st.info("Synchronizing permissions across all users...")
+            with col_bulk3:
+                if st.button("📊 Export User List"):
+                    st.info("Exporting client user data...")
+            with col_bulk4:
+                if st.button("⚠️ Security Audit"):
+                    st.info("Running security audit on client accounts...")
     
     with col2:
         st.markdown("#### Access Statistics")
         
+        total_users = len(client_users)
+        active_users = len([c for c in client_users if c.get('status') == 'Active'])
+        pending_users = len([c for c in client_users if c.get('status') == 'Pending Setup'])
+        
         access_stats = [
-            ("Total Portal Users", "87"),
-            ("Active This Month", "64"),
-            ("Pending Setup", "8"),
+            ("Total Portal Users", str(total_users)),
+            ("Active This Month", str(active_users)),
+            ("Pending Setup", str(pending_users)),
             ("Login Success Rate", "98.2%")
         ]
         
@@ -414,28 +537,39 @@ def show_client_access():
         
         st.markdown("#### Access Levels")
         
-        access_breakdown = [
-            ("Full Access", "45 users", "52%"),
-            ("Limited Access", "28 users", "32%"),
-            ("View Only", "12 users", "14%"),
-            ("Suspended", "2 users", "2%")
-        ]
+        full_access = len([c for c in client_users if c.get('access_level') == 'Full Access'])
+        limited_access = len([c for c in client_users if c.get('access_level') == 'Limited Access'])
+        view_only = len([c for c in client_users if c.get('access_level') == 'View Only'])
+        suspended = len([c for c in client_users if c.get('status') == 'Suspended'])
+        
+        if total_users > 0:
+            access_breakdown = [
+                ("Full Access", f"{full_access} users", f"{full_access/total_users*100:.0f}%"),
+                ("Limited Access", f"{limited_access} users", f"{limited_access/total_users*100:.0f}%"),
+                ("View Only", f"{view_only} users", f"{view_only/total_users*100:.0f}%"),
+                ("Suspended", f"{suspended} users", f"{suspended/total_users*100:.0f}%")
+            ]
+        else:
+            access_breakdown = [
+                ("Full Access", "0 users", "0%"),
+                ("Limited Access", "0 users", "0%"),
+                ("View Only", "0 users", "0%"),
+                ("Suspended", "0 users", "0%")
+            ]
         
         for level, count, percentage in access_breakdown:
             st.write(f"**{level}:** {count} ({percentage})")
-        
-        st.markdown("#### Recent Activity")
-        
-        recent_activity = [
-            "John Smith logged in",
-            "New user invitation sent",
-            "Permission updated for Tech Solutions",
-            "Password reset completed",
-            "Document access granted"
-        ]
-        
-        for activity in recent_activity:
-            st.write(f"• {activity}")
+
+def get_permissions_for_access_level(access_level):
+    """Get default permissions based on access level"""
+    if access_level == "Full Access":
+        return ["View Documents", "Download Files", "Submit Requests", "View Billing", "Approve Invoices"]
+    elif access_level == "Limited Access":
+        return ["View Documents", "Download Files", "Submit Requests"]
+    elif access_level == "View Only":
+        return ["View Documents"]
+    else:
+        return []
 
 def show_document_sharing():
     st.subheader("📄 Client Document Sharing")
