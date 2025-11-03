@@ -2,6 +2,49 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import calendar
+import json
+import os
+
+# Data persistence functions
+DATA_DIR = "user_data"
+
+def ensure_data_dir():
+    """Ensure data directory exists"""
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+
+def get_user_file(user_email, data_type):
+    """Get file path for user data"""
+    ensure_data_dir()
+    safe_email = user_email.replace('@', '_at_').replace('.', '_')
+    return os.path.join(DATA_DIR, f"{safe_email}_{data_type}.json")
+
+def save_user_data(user_email, data_type, data):
+    """Save user data to file"""
+    file_path = get_user_file(user_email, data_type)
+    with open(file_path, 'w') as f:
+        json.dump(data, f, default=str)
+
+def load_user_data(user_email, data_type, default=None):
+    """Load user data from file"""
+    file_path = get_user_file(user_email, data_type)
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    return default if default is not None else []
+
+def auto_save_calendar_data():
+    """Automatically save calendar data"""
+    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
+    
+    if 'events' in st.session_state:
+        save_user_data(user_email, 'events', st.session_state.events)
+    
+    if 'tasks' in st.session_state:
+        save_user_data(user_email, 'tasks', st.session_state.tasks)
+    
+    if 'court_deadlines' in st.session_state:
+        save_user_data(user_email, 'court_deadlines', st.session_state.court_deadlines)
 
 def show():
     # Professional header styling
@@ -100,8 +143,6 @@ def show():
         color: #1e293b !important;
     }
     
-    /* ADD THESE NEW RULES: */
-    
     /* Query Suggestions - white boxes with dark text */
     .element-container:has(.stButton) {
         background: white !important;
@@ -185,15 +226,12 @@ def show():
     }
 
     /* Dropdown menus - comprehensive fix */
-
-    /* The dropdown container itself */
     .stSelectbox,
     [data-testid="stSelectbox"] {
         background: white !important;
         border-radius: 8px !important;
     }
     
-    /* Dropdown button/selector - dark text */
     .stSelectbox [data-baseweb="select"],
     [data-testid="stSelectbox"] [data-baseweb="select"],
     .stSelectbox [data-baseweb="select"] > div,
@@ -202,20 +240,17 @@ def show():
         color: #1e293b !important;
     }
     
-    /* All text inside the dropdown selector */
     .stSelectbox [data-baseweb="select"] *,
     [data-testid="stSelectbox"] [data-baseweb="select"] * {
         color: #1e293b !important;
     }
     
-    /* Dropdown popover/menu when opened */
     [data-baseweb="popover"],
     [role="listbox"],
     [data-baseweb="menu"] {
         background: white !important;
     }
     
-    /* All options in dropdown list */
     [data-baseweb="popover"] *,
     [role="listbox"] *,
     [role="option"],
@@ -226,33 +261,28 @@ def show():
         background: white !important;
     }
     
-    /* Selected option */
     [aria-selected="true"] {
         background: rgba(59, 130, 246, 0.1) !important;
         color: #1e293b !important;
     }
     
-    /* Hovered option */
     [role="option"]:hover,
     [data-baseweb="menu"] li:hover {
         background: rgba(59, 130, 246, 0.15) !important;
         color: #1e293b !important;
     }
     
-    /* Multi-select tags */
     .stMultiSelect [data-baseweb="tag"],
     .stMultiSelect [data-baseweb="tag"] * {
         background: rgba(59, 130, 246, 0.2) !important;
         color: #1e293b !important;
     }
     
-    /* Dropdown arrow/icon */
     .stSelectbox svg,
     [data-testid="stSelectbox"] svg {
         fill: #1e293b !important;
     }
 
-    /* Streamlit selectbox - force dark text everywhere */
     div[data-baseweb="select"] {
         background: white !important;
     }
@@ -265,7 +295,6 @@ def show():
         background: white !important;
     }
     
-    /* The actual dropdown panel when opened */
     ul[role="listbox"] {
         background: white !important;
     }
@@ -275,7 +304,6 @@ def show():
         color: #1e293b !important;
     }
     
-    /* Force override any remaining light text in dropdowns */
     [data-baseweb="select"] [data-baseweb="select-dropdown"] *,
     [data-baseweb="popover-content"] *,
     .stSelectbox * {
@@ -306,8 +334,6 @@ def show():
         background-color: rgba(59, 130, 246, 0.8);
         color: white;
     }
-    
-
     </style>
     <div class="ai-header">
         <h1>📅 Calendar & Tasks</h1>
@@ -315,12 +341,17 @@ def show():
     </div>
     """, unsafe_allow_html=True)
 
-    # Initialize session state for events and tasks
+    # Initialize real user data
+    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
+    
     if 'events' not in st.session_state:
-        st.session_state.events = []  # Will be populated with default events
+        st.session_state.events = load_user_data(user_email, 'events', [])
     
     if 'tasks' not in st.session_state:
-        st.session_state.tasks = []  # Will be populated with default tasks
+        st.session_state.tasks = load_user_data(user_email, 'tasks', [])
+    
+    if 'court_deadlines' not in st.session_state:
+        st.session_state.court_deadlines = load_user_data(user_email, 'court_deadlines', [])
     
     # Calendar tabs
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -357,108 +388,42 @@ def show_calendar_view():
         with col_c:
             filter_type = st.selectbox("Filter:", ["All Events", "Meetings", "Deadlines", "Court Dates"])
         
-        # Calendar display (simplified representation)
+        # Calendar display
         st.markdown("#### Calendar Events")
         
-        # Generate sample events
-        events = [
-            {
-                "time": "09:00 AM",
-                "title": "Client Meeting - ABC Corp",
-                "type": "Meeting",
-                "duration": "1 hour",
-                "location": "Conference Room A",
-                "attendees": "John Smith, Sarah Johnson"
-            },
-            {
-                "time": "11:30 AM",
-                "title": "Discovery Deadline - Case #2024-156",
-                "type": "Deadline",
-                "duration": "All day",
-                "location": "N/A",
-                "attendees": "Legal Team"
-            },
-            {
-                "time": "02:00 PM",
-                "title": "Court Hearing - Superior Court",
-                "type": "Court Date",
-                "duration": "2 hours",
-                "location": "Courthouse Room 301",
-                "attendees": "Attorney, Client"
-            },
-            {
-                "time": "04:30 PM",
-                "title": "Internal Review Meeting",
-                "type": "Meeting",
-                "duration": "45 minutes",
-                "location": "Virtual",
-                "attendees": "Partners, Associates"
-            }
-        ]
+        if not st.session_state.events:
+            st.info("📅 No events yet. Add your first event using the form on the right.")
         
         for event in st.session_state.events:
-            with st.expander(f"{event['time']} - {event['title']}"):
+            with st.expander(f"{event.get('time', 'N/A')} - {event.get('title', 'Untitled')}"):
                 col_x, col_y = st.columns(2)
                 with col_x:
-                    st.write(f"**Type:** {event['type']}")
-                    st.write(f"**Duration:** {event['duration']}")
+                    st.write(f"**Type:** {event.get('type', 'N/A')}")
+                    st.write(f"**Duration:** {event.get('duration', 'N/A')}")
                 with col_y:
-                    st.write(f"**Location:** {event['location']}")
-                    st.write(f"**Attendees:** {event['attendees']}")
+                    st.write(f"**Location:** {event.get('location', 'N/A')}")
+                    st.write(f"**Attendees:** {event.get('attendees', 'N/A')}")
                 
                 col_action1, col_action2, col_action3 = st.columns(3)
                 with col_action1:
-                    if st.button("✏️ Edit", key=f"edit_{event['time']}_{event['title'][:10]}"):
-                        st.session_state.editing_event = event
-                        st.info(f"Editing: {event['title']}")
+                    if st.button("✏️ Edit", key=f"edit_event_{event.get('id')}"):
+                        st.session_state.editing_event_id = event.get('id')
+                        st.info(f"Editing: {event.get('title')}")
+                        st.rerun()
+                
                 with col_action2:
-                    if st.button("📧 Notify", key=f"notify_{event['time']}_{event['title'][:10]}"):
-                        st.success(f"✓ Notifications sent for {event['title']}")
+                    if st.button("📧 Notify", key=f"notify_event_{event.get('id')}"):
+                        st.success(f"✓ Notifications sent for {event.get('title')}")
+                
                 with col_action3:
-                    if st.button("❌ Cancel", key=f"cancel_{event['time']}_{event['title'][:10]}"):
-                        st.session_state.events.remove(event)
-                        st.success(f"✓ Event '{event['title']}' cancelled")
+                    if st.button("🗑️ Delete", key=f"delete_event_{event.get('id')}"):
+                        st.session_state.events = [e for e in st.session_state.events if e.get('id') != event.get('id')]
+                        auto_save_calendar_data()
+                        st.success(f"✓ Event '{event.get('title')}' deleted")
                         st.rerun()
     
     with col2:
         st.markdown("#### Quick Add Event")
-        
-        # Initialize session state for events
-        if 'events' not in st.session_state:
-            st.session_state.events = [
-                {
-                    "time": "09:00 AM",
-                    "title": "Client Meeting - ABC Corp",
-                    "type": "Meeting",
-                    "duration": "1 hour",
-                    "location": "Conference Room A",
-                    "attendees": "John Smith, Sarah Johnson"
-                },
-                {
-                    "time": "11:30 AM",
-                    "title": "Discovery Deadline - Case #2024-156",
-                    "type": "Deadline",
-                    "duration": "All day",
-                    "location": "N/A",
-                    "attendees": "Legal Team"
-                },
-                {
-                    "time": "02:00 PM",
-                    "title": "Court Hearing - Superior Court",
-                    "type": "Court Date",
-                    "duration": "2 hours",
-                    "location": "Courthouse Room 301",
-                    "attendees": "Attorney, Client"
-                },
-                {
-                    "time": "04:30 PM",
-                    "title": "Internal Review Meeting",
-                    "type": "Meeting",
-                    "duration": "45 minutes",
-                    "location": "Virtual",
-                    "attendees": "Partners, Associates"
-                }
-            ]
         
         with st.form("add_event"):
             event_title = st.text_input("Event Title:")
@@ -472,7 +437,9 @@ def show_calendar_view():
             if st.form_submit_button("➕ Add Event"):
                 if event_title:
                     new_event = {
+                        "id": len(st.session_state.events) + 1,
                         "time": event_time.strftime("%I:%M %p"),
+                        "date": event_date.strftime("%Y-%m-%d"),
                         "title": event_title,
                         "type": event_type,
                         "duration": event_duration,
@@ -480,27 +447,22 @@ def show_calendar_view():
                         "attendees": event_attendees
                     }
                     st.session_state.events.append(new_event)
+                    auto_save_calendar_data()
                     st.success(f"✓ Event '{event_title}' added successfully!")
                     st.rerun()
                 else:
                     st.error("Please enter an event title")
         
         st.markdown("#### Today's Summary")
-        st.metric("Total Events", "4")
-        st.metric("Meetings", "2")
-        st.metric("Deadlines", "1")
-        st.metric("Court Dates", "1")
+        total_events = len(st.session_state.events)
+        meetings = len([e for e in st.session_state.events if e.get('type') == 'Meeting'])
+        deadlines = len([e for e in st.session_state.events if e.get('type') == 'Deadline'])
+        court_dates = len([e for e in st.session_state.events if e.get('type') == 'Court Date'])
         
-        st.markdown("#### Upcoming Alerts")
-        alerts = [
-            "⏰ Meeting in 30 minutes",
-            "📅 Deadline tomorrow",
-            "⚖️ Court date next week",
-            "📋 Review due Friday"
-        ]
-        
-        for alert in alerts:
-            st.info(alert)
+        st.metric("Total Events", total_events)
+        st.metric("Meetings", meetings)
+        st.metric("Deadlines", deadlines)
+        st.metric("Court Dates", court_dates)
 
 def show_task_management():
     st.subheader("✅ Task Management Dashboard")
@@ -520,146 +482,82 @@ def show_task_management():
         # Task list
         st.markdown("#### Task List")
         
-        tasks = [
-            {
-                "id": "T001",
-                "title": "Review merger agreement draft",
-                "assignee": "Sarah Johnson",
-                "priority": "High",
-                "status": "In Progress",
-                "due_date": "2024-09-25",
-                "matter": "ABC Corp Acquisition",
-                "progress": 75
-            },
-            {
-                "id": "T002",
-                "title": "Prepare discovery responses",
-                "assignee": "Mike Davis",
-                "priority": "High",
-                "status": "Pending",
-                "due_date": "2024-09-24",
-                "matter": "Johnson vs. Tech Solutions",
-                "progress": 25
-            },
-            {
-                "id": "T003",
-                "title": "Client contract review",
-                "assignee": "Emily Chen",
-                "priority": "Medium",
-                "status": "In Progress",
-                "due_date": "2024-09-27",
-                "matter": "XYZ Services Agreement",
-                "progress": 50
-            },
-            {
-                "id": "T004",
-                "title": "File motion to dismiss",
-                "assignee": "John Smith",
-                "priority": "High",
-                "status": "Completed",
-                "due_date": "2024-09-20",
-                "matter": "Continental Corp Defense",
-                "progress": 100
-            }
-        ]
+        if not st.session_state.tasks:
+            st.info("✅ No tasks yet. Create your first task using the form on the right.")
         
-        for task in st.session_state.tasks:
+        # Apply filters
+        filtered_tasks = st.session_state.tasks
+        
+        if priority_filter != "All":
+            filtered_tasks = [t for t in filtered_tasks if t.get('priority') == priority_filter]
+        
+        if status_filter != "All":
+            filtered_tasks = [t for t in filtered_tasks if t.get('status') == status_filter]
+        
+        for task in filtered_tasks:
             priority_color = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}
             status_color = {"Pending": "⭕", "In Progress": "🔄", "Completed": "✅"}
             
-            with st.expander(f"{priority_color[task['priority']]} {task['title']} - Due: {task['due_date']}"):
+            with st.expander(f"{priority_color.get(task.get('priority'), '⚪')} {task.get('title', 'Untitled')} - Due: {task.get('due_date', 'N/A')}"):
                 col_x, col_y = st.columns(2)
                 with col_x:
-                    st.write(f"**Assignee:** {task['assignee']}")
-                    st.write(f"**Matter:** {task['matter']}")
-                    st.write(f"**Status:** {status_color[task['status']]} {task['status']}")
+                    st.write(f"**Assignee:** {task.get('assignee', 'Unassigned')}")
+                    st.write(f"**Matter:** {task.get('matter', 'N/A')}")
+                    st.write(f"**Status:** {status_color.get(task.get('status'), '❓')} {task.get('status', 'Unknown')}")
                 with col_y:
-                    st.write(f"**Priority:** {task['priority']}")
-                    st.write(f"**Task ID:** {task['id']}")
-                    st.progress(task['progress'] / 100)
+                    st.write(f"**Priority:** {task.get('priority', 'N/A')}")
+                    st.write(f"**Task ID:** {task.get('id', 'N/A')}")
+                    st.progress(task.get('progress', 0) / 100)
+                
+                if task.get('description'):
+                    st.write(f"**Description:** {task.get('description')}")
                 
                 # Task actions
                 col_action1, col_action2, col_action3, col_action4 = st.columns(4)
-                with col_action1:
-                    if st.button("✏️ Edit", key=f"edit_task_{task['id']}"):
-                        st.session_state.editing_task = task['id']
-                        st.info(f"Editing task: {task['title']}")
-                with col_action2:
-                    if st.button("👥 Assign", key=f"assign_task_{task['id']}"):
-                        st.info(f"Reassigning task: {task['title']}")
-                with col_action3:
-                    if st.button("💬 Comment", key=f"comment_task_{task['id']}"):
-                        if 'task_comments' not in st.session_state:
-                            st.session_state.task_comments = {}
-                        st.info(f"Add comment to: {task['title']}")
-                with col_action4:
-                    if st.button("📎 Attach", key=f"attach_task_{task['id']}"):
-                        st.info(f"Attach file to: {task['title']}")
                 
-                # Add status update button
-                if st.button("✓ Mark Complete", key=f"complete_task_{task['id']}"):
-                    for t in st.session_state.tasks:
-                        if t['id'] == task['id']:
-                            t['status'] = 'Completed'
-                            t['progress'] = 100
-                            st.success(f"✓ Task '{task['title']}' marked as complete!")
-                            st.rerun()
-                            break
+                with col_action1:
+                    if st.button("✏️ Edit", key=f"edit_task_{task.get('id')}"):
+                        st.session_state.editing_task_id = task.get('id')
+                        st.info(f"Editing task: {task.get('title')}")
+                
+                with col_action2:
+                    if task.get('status') != 'Completed':
+                        if st.button("✓ Complete", key=f"complete_task_{task.get('id')}"):
+                            for t in st.session_state.tasks:
+                                if t.get('id') == task.get('id'):
+                                    t['status'] = 'Completed'
+                                    t['progress'] = 100
+                                    auto_save_calendar_data()
+                                    st.success(f"✓ Task '{task.get('title')}' completed!")
+                                    st.rerun()
+                
+                with col_action3:
+                    if st.button("💬 Comment", key=f"comment_task_{task.get('id')}"):
+                        st.info(f"Add comment to: {task.get('title')}")
+                
+                with col_action4:
+                    if st.button("🗑️ Delete", key=f"delete_task_{task.get('id')}"):
+                        st.session_state.tasks = [t for t in st.session_state.tasks if t.get('id') != task.get('id')]
+                        auto_save_calendar_data()
+                        st.success(f"✓ Task deleted")
+                        st.rerun()
     
     with col2:
         st.markdown("#### Create New Task")
         
-        # Initialize session state for tasks
-        if 'tasks' not in st.session_state:
-            st.session_state.tasks = [
-                {
-                    "id": "T001",
-                    "title": "Review merger agreement draft",
-                    "assignee": "Sarah Johnson",
-                    "priority": "High",
-                    "status": "In Progress",
-                    "due_date": "2024-09-25",
-                    "matter": "ABC Corp Acquisition",
-                    "progress": 75
-                },
-                {
-                    "id": "T002",
-                    "title": "Prepare discovery responses",
-                    "assignee": "Mike Davis",
-                    "priority": "High",
-                    "status": "Pending",
-                    "due_date": "2024-09-24",
-                    "matter": "Johnson vs. Tech Solutions",
-                    "progress": 25
-                },
-                {
-                    "id": "T003",
-                    "title": "Client contract review",
-                    "assignee": "Emily Chen",
-                    "priority": "Medium",
-                    "status": "In Progress",
-                    "due_date": "2024-09-27",
-                    "matter": "XYZ Services Agreement",
-                    "progress": 50
-                },
-                {
-                    "id": "T004",
-                    "title": "File motion to dismiss",
-                    "assignee": "John Smith",
-                    "priority": "High",
-                    "status": "Completed",
-                    "due_date": "2024-09-20",
-                    "matter": "Continental Corp Defense",
-                    "progress": 100
-                }
-            ]
+        # Get matters for dropdown
+        matters = st.session_state.get('matters', [])
+        if matters:
+            matter_names = [m.get('name', 'Untitled') if isinstance(m, dict) else getattr(m, 'name', 'Untitled') for m in matters]
+        else:
+            matter_names = ["General"]
         
         with st.form("new_task"):
             task_title = st.text_input("Task Title:")
-            task_assignee = st.selectbox("Assign to:", ["John Smith", "Sarah Johnson", "Mike Davis", "Emily Chen"])
+            task_assignee = st.text_input("Assign to:", value=st.session_state.get('user_data', {}).get('name', 'Me'))
             task_priority = st.selectbox("Priority:", ["High", "Medium", "Low"])
             task_due = st.date_input("Due Date:")
-            task_matter = st.selectbox("Related Matter:", ["ABC Corp Acquisition", "Johnson vs. Tech Solutions", "XYZ Services Agreement"])
+            task_matter = st.selectbox("Related Matter:", matter_names)
             task_description = st.text_area("Description:")
             
             if st.form_submit_button("➕ Create Task"):
@@ -676,16 +574,22 @@ def show_task_management():
                         "description": task_description
                     }
                     st.session_state.tasks.append(new_task)
+                    auto_save_calendar_data()
                     st.success(f"✓ Task '{task_title}' created successfully!")
                     st.rerun()
                 else:
                     st.error("Please enter a task title")
         
         st.markdown("#### Task Statistics")
-        st.metric("Total Tasks", "47")
-        st.metric("Completed This Week", "12", "+3")
-        st.metric("Overdue Tasks", "3", "-2")
-        st.metric("High Priority", "8")
+        total_tasks = len(st.session_state.tasks)
+        completed_tasks = len([t for t in st.session_state.tasks if t.get('status') == 'Completed'])
+        pending_tasks = len([t for t in st.session_state.tasks if t.get('status') == 'Pending'])
+        high_priority = len([t for t in st.session_state.tasks if t.get('priority') == 'High'])
+        
+        st.metric("Total Tasks", total_tasks)
+        st.metric("Completed", completed_tasks)
+        st.metric("Pending", pending_tasks)
+        st.metric("High Priority", high_priority)
 
 def show_court_deadlines():
     st.subheader("⚖️ Court Deadlines & Filing Management")
@@ -702,52 +606,27 @@ def show_court_deadlines():
         with col_b:
             court_filter = st.selectbox("Court:", ["All Courts", "Federal Court", "State Court", "Superior Court"])
         
-        # Deadlines list
-        deadlines = [
-            {
-                "case": "Johnson vs. Tech Solutions Inc.",
-                "deadline": "Motion to Dismiss",
-                "due_date": "2024-09-24",
-                "days_remaining": 1,
-                "court": "Superior Court",
-                "assigned": "John Smith",
-                "status": "In Progress"
-            },
-            {
-                "case": "ABC Corp Acquisition Review",
-                "deadline": "Regulatory Filing",
-                "due_date": "2024-09-26",
-                "days_remaining": 3,
-                "court": "Federal Court",
-                "assigned": "Sarah Johnson",
-                "status": "Pending Review"
-            },
-            {
-                "case": "Continental Corp vs. Innovate LLC",
-                "deadline": "Discovery Response",
-                "due_date": "2024-09-30",
-                "days_remaining": 7,
-                "court": "State Court",
-                "assigned": "Mike Davis",
-                "status": "Draft Complete"
-            },
-            {
-                "case": "XYZ Services Contract Dispute",
-                "deadline": "Summary Judgment Brief",
-                "due_date": "2024-10-05",
-                "days_remaining": 12,
-                "court": "Superior Court",
-                "assigned": "Emily Chen",
-                "status": "Research Phase"
-            }
-        ]
+        if not st.session_state.court_deadlines:
+            st.info("⚖️ No court deadlines yet. Add your first deadline using the form on the right.")
         
-        for deadline in deadlines:
+        # Deadlines list
+        for deadline in st.session_state.court_deadlines:
+            # Calculate days remaining
+            due_date_str = deadline.get('due_date', '')
+            if due_date_str:
+                try:
+                    due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
+                    days_remaining = (due_date - datetime.now()).days
+                except:
+                    days_remaining = 0
+            else:
+                days_remaining = 0
+            
             # Color coding based on urgency
-            if deadline["days_remaining"] <= 1:
+            if days_remaining <= 1:
                 urgency_color = "🔴"
                 border_color = "red"
-            elif deadline["days_remaining"] <= 7:
+            elif days_remaining <= 7:
                 urgency_color = "🟡"
                 border_color = "orange"
             else:
@@ -759,62 +638,89 @@ def show_court_deadlines():
             </div>
             """, unsafe_allow_html=True)
             
-            with st.expander(f"{urgency_color} {deadline['deadline']} - {deadline['case']} (Due: {deadline['due_date']})"):
+            with st.expander(f"{urgency_color} {deadline.get('deadline_type', 'Deadline')} - {deadline.get('case', 'Unknown')} (Due: {due_date_str})"):
                 col_x, col_y = st.columns(2)
                 with col_x:
-                    st.write(f"**Court:** {deadline['court']}")
-                    st.write(f"**Assigned:** {deadline['assigned']}")
+                    st.write(f"**Court:** {deadline.get('court', 'N/A')}")
+                    st.write(f"**Assigned:** {deadline.get('assigned', 'Unassigned')}")
                 with col_y:
-                    st.write(f"**Status:** {deadline['status']}")
-                    st.write(f"**Days Remaining:** {deadline['days_remaining']}")
+                    st.write(f"**Status:** {deadline.get('status', 'Pending')}")
+                    st.write(f"**Days Remaining:** {days_remaining}")
                 
                 # Action buttons
                 col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
                 with col_btn1:
-                    st.button("📄 View Details", key=f"view_{deadline['case'][:10]}")
+                    if st.button("📄 View Details", key=f"view_deadline_{deadline.get('id')}"):
+                        st.info(f"Viewing details for: {deadline.get('case')}")
+                
                 with col_btn2:
-                    st.button("📝 Update Status", key=f"status_{deadline['case'][:10]}")
+                    if st.button("📝 Update Status", key=f"status_deadline_{deadline.get('id')}"):
+                        st.info("Update status form...")
+                
                 with col_btn3:
-                    st.button("📧 Send Reminder", key=f"remind_{deadline['case'][:10]}")
+                    if st.button("📧 Send Reminder", key=f"remind_deadline_{deadline.get('id')}"):
+                        st.success("Reminder sent!")
+                
                 with col_btn4:
-                    st.button("📎 Attach File", key=f"attach_{deadline['case'][:10]}")
+                    if st.button("🗑️ Delete", key=f"delete_deadline_{deadline.get('id')}"):
+                        st.session_state.court_deadlines = [d for d in st.session_state.court_deadlines if d.get('id') != deadline.get('id')]
+                        auto_save_calendar_data()
+                        st.success("Deadline deleted")
+                        st.rerun()
     
     with col2:
-        st.markdown("#### Deadline Alerts")
+        st.markdown("#### Add Court Deadline")
         
-        alerts = [
-            ("🔴 URGENT", "Motion due tomorrow"),
-            ("🟡 SOON", "Filing due in 3 days"),
-            ("🟢 SCHEDULED", "Brief due next week"),
-            ("📅 REMINDER", "Court date in 2 weeks")
-        ]
-        
-        for severity, alert in alerts:
-            if "URGENT" in severity:
-                st.error(f"{severity}: {alert}")
-            elif "SOON" in severity:
-                st.warning(f"{severity}: {alert}")
-            else:
-                st.info(f"{severity}: {alert}")
-        
-        st.markdown("#### Quick Actions")
-        if st.button("📅 Add Court Date"):
-            st.success("✓ Court date form opened - use the calendar tab to add events")
+        with st.form("add_deadline"):
+            case_name = st.text_input("Case Name:")
+            deadline_type = st.selectbox("Deadline Type:", [
+                "Motion to Dismiss",
+                "Discovery Response",
+                "Regulatory Filing",
+                "Summary Judgment Brief",
+                "Other"
+            ])
+            due_date = st.date_input("Due Date:")
+            court = st.selectbox("Court:", ["Federal Court", "State Court", "Superior Court", "Other"])
+            assigned_to = st.text_input("Assigned To:", value=st.session_state.get('user_data', {}).get('name', 'Me'))
+            status = st.selectbox("Status:", ["Pending", "In Progress", "Draft Complete", "Filed"])
             
-        if st.button("⏰ Set Reminder"):
-            st.success("✓ Reminder set for upcoming deadlines")
-            
-        if st.button("📊 Deadline Report"):
-            # Generate a simple report
-            st.info("Deadline Report Generated:")
-            report_data = {
-                "Total Deadlines": 4,
-                "Urgent (1 day)": 1,
-                "Soon (7 days)": 1,
-                "Upcoming": 2
-            }
-            for key, value in report_data.items():
-                st.write(f"**{key}:** {value}")
+            if st.form_submit_button("➕ Add Deadline"):
+                if case_name and deadline_type:
+                    new_deadline = {
+                        "id": len(st.session_state.court_deadlines) + 1,
+                        "case": case_name,
+                        "deadline_type": deadline_type,
+                        "due_date": due_date.strftime("%Y-%m-%d"),
+                        "court": court,
+                        "assigned": assigned_to,
+                        "status": status
+                    }
+                    st.session_state.court_deadlines.append(new_deadline)
+                    auto_save_calendar_data()
+                    st.success(f"✓ Deadline added: {deadline_type} for {case_name}")
+                    st.rerun()
+                else:
+                    st.error("Please fill in case name and deadline type")
+        
+        st.markdown("#### Deadline Statistics")
+        total_deadlines = len(st.session_state.court_deadlines)
+        
+        # Count urgent deadlines
+        urgent = 0
+        for d in st.session_state.court_deadlines:
+            due_date_str = d.get('due_date', '')
+            if due_date_str:
+                try:
+                    due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
+                    days_remaining = (due_date - datetime.now()).days
+                    if days_remaining <= 7:
+                        urgent += 1
+                except:
+                    pass
+        
+        st.metric("Total Deadlines", total_deadlines)
+        st.metric("Urgent (7 days)", urgent)
 
 def show_matter_schedule():
     st.subheader("📋 Matter Schedule & Milestones")
@@ -822,133 +728,88 @@ def show_matter_schedule():
     col1, col2 = st.columns([2, 1])
     
     with col1:
+        # Get matters
+        matters = st.session_state.get('matters', [])
+        
+        if not matters:
+            st.info("📋 No matters available. Create matters in Matter Management first.")
+            return
+        
         # Matter selection
-        selected_matter = st.selectbox("Select Matter:", [
-            "ABC Corp Acquisition",
-            "Johnson vs. Tech Solutions",
-            "Continental Corp Defense",
-            "XYZ Services Agreement",
-            "Innovation LLC Patent Dispute"
-        ])
+        matter_names = [m.get('name', 'Untitled') if isinstance(m, dict) else getattr(m, 'name', 'Untitled') for m in matters]
+        selected_matter = st.selectbox("Select Matter:", matter_names)
         
         st.markdown(f"#### Timeline for {selected_matter}")
         
-        # Timeline visualization
-        timeline_events = [
-            {
-                "date": "2024-09-15",
-                "milestone": "Case Initiation",
-                "status": "Completed",
-                "description": "Initial client meeting and case assessment"
-            },
-            {
-                "date": "2024-09-20",
-                "milestone": "Discovery Request",
-                "status": "Completed",
-                "description": "Filed initial discovery requests"
-            },
-            {
-                "date": "2024-09-25",
-                "milestone": "Document Review",
-                "status": "In Progress",
-                "description": "Review client documents and evidence"
-            },
-            {
-                "date": "2024-10-01",
-                "milestone": "Expert Witness Selection",
-                "status": "Pending",
-                "description": "Identify and retain expert witnesses"
-            },
-            {
-                "date": "2024-10-15",
-                "milestone": "Motion Filing",
-                "status": "Scheduled",
-                "description": "File motion for summary judgment"
-            },
-            {
-                "date": "2024-11-01",
-                "milestone": "Settlement Conference",
-                "status": "Scheduled",
-                "description": "Court-ordered settlement conference"
-            }
-        ]
+        # Get selected matter details
+        selected_matter_obj = None
+        for m in matters:
+            matter_name = m.get('name', 'Untitled') if isinstance(m, dict) else getattr(m, 'name', 'Untitled')
+            if matter_name == selected_matter:
+                selected_matter_obj = m
+                break
         
-        for i, event in enumerate(timeline_events):
-            status_icons = {
-                "Completed": "✅",
-                "In Progress": "🔄",
-                "Pending": "⭕",
-                "Scheduled": "📅"
-            }
+        if selected_matter_obj:
+            # Show matter details
+            col_detail1, col_detail2 = st.columns(2)
             
-            status_colors = {
-                "Completed": "green",
-                "In Progress": "blue",
-                "Pending": "orange",
-                "Scheduled": "purple"
-            }
+            with col_detail1:
+                client = selected_matter_obj.get('client_name', 'N/A') if isinstance(selected_matter_obj, dict) else getattr(selected_matter_obj, 'client_name', 'N/A')
+                status = selected_matter_obj.get('status', 'N/A') if isinstance(selected_matter_obj, dict) else getattr(selected_matter_obj, 'status', 'N/A')
+                st.write(f"**Client:** {client}")
+                st.write(f"**Status:** {status}")
             
-            st.markdown(f"""
-            <div style="border-left: 3px solid {status_colors[event['status']]}; padding-left: 15px; margin: 15px 0;">
-                <h4>{status_icons[event['status']]} {event['milestone']}</h4>
-                <p><strong>Date:</strong> {event['date']}</p>
-                <p><strong>Status:</strong> {event['status']}</p>
-                <p>{event['description']}</p>
-            </div>
-            """, unsafe_allow_html=True)
+            with col_detail2:
+                created = selected_matter_obj.get('created_date', 'N/A') if isinstance(selected_matter_obj, dict) else getattr(selected_matter_obj, 'created_date', 'N/A')
+                if isinstance(created, datetime):
+                    created = created.strftime('%Y-%m-%d')
+                st.write(f"**Created:** {created}")
+        
+        # Timeline events (simplified)
+        st.markdown("#### Matter Milestones")
+        
+        st.info("📅 Matter timeline and milestones coming soon. Track progress through tasks and calendar events.")
         
         st.markdown("#### Matter Resources")
         
         col_res1, col_res2, col_res3 = st.columns(3)
         with col_res1:
             if st.button("📁 View Documents"):
-                st.success("✓ Document library - 47 documents available")
+                st.success("✓ Opening document library...")
         with col_res2:
             if st.button("👥 Team Members"):
-                st.success("✓ Team: 4 members assigned to this matter")
+                st.success("✓ Opening team view...")
         with col_res3:
             if st.button("💰 Budget Tracking"):
-                st.success("✓ Budget: $45,000 / $140,000 (32% utilized)")
+                st.success("✓ Opening budget tracker...")
     
     with col2:
         st.markdown("#### Matter Progress")
         
-        progress_metrics = [
-            ("Overall Progress", 45, "%"),
-            ("Discovery Complete", 75, "%"),
-            ("Document Review", 60, "%"),
-            ("Budget Utilized", 32, "%")
-        ]
+        if selected_matter_obj:
+            # Get actual progress from matter
+            estimated_hours = selected_matter_obj.get('estimated_hours', 0) if isinstance(selected_matter_obj, dict) else getattr(selected_matter_obj, 'estimated_hours', 0)
+            actual_hours = selected_matter_obj.get('actual_hours', 0) if isinstance(selected_matter_obj, dict) else getattr(selected_matter_obj, 'actual_hours', 0)
+            budget = selected_matter_obj.get('budget', 0) if isinstance(selected_matter_obj, dict) else getattr(selected_matter_obj, 'budget', 0)
+            
+            progress = (actual_hours / estimated_hours * 100) if estimated_hours > 0 else 0
+            
+            st.metric("Overall Progress", f"{progress:.0f}%")
+            st.progress(progress / 100)
+            
+            st.metric("Hours Logged", f"{actual_hours:.1f} / {estimated_hours:.1f}")
+            st.metric("Budget", f"${budget:,.0f}")
         
-        for label, value, unit in progress_metrics:
-            st.metric(label, f"{value}{unit}")
-            st.progress(value / 100)
+        st.markdown("#### Quick Actions")
         
-        st.markdown("#### Next Actions")
-        next_actions = [
-            "📋 Complete document review by Friday",
-            "📞 Schedule expert witness interview",
-            "📝 Draft motion for summary judgment",
-            "📧 Send status update to client",
-            "⏰ Prepare for settlement conference"
-        ]
+        if st.button("➕ Add Milestone"):
+            st.info("Milestone feature coming soon...")
         
-        for action in next_actions:
-            st.write(action)
+        if st.button("📊 View Timeline"):
+            st.info("Timeline view coming soon...")
         
-        st.markdown("#### Matter Team")
-        team_members = [
-            ("John Smith", "Lead Attorney"),
-            ("Sarah Johnson", "Associate"),
-            ("Mike Davis", "Paralegal"),
-            ("Emily Chen", "Legal Assistant")
-        ]
-        
-        for name, role in team_members:
-            st.write(f"**{name}** - {role}")
-        
-        if st.button("➕ Add Team Member"):
-            st.info("Opening team member form...")
+        if st.button("📧 Send Update"):
+            st.info("Sending matter update...")
 
 # Main application entry point
 if __name__ == "__main__":
