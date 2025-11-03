@@ -6,6 +6,17 @@ from datetime import datetime, timedelta
 import json
 
 def show():
+    # Initialize session state for search results and interactions
+    if 'search_results' not in st.session_state:
+        st.session_state.search_results = None
+    if 'search_query' not in st.session_state:
+        st.session_state.search_query = ""
+    if 'document_results' not in st.session_state:
+        st.session_state.document_results = None
+    if 'ai_results' not in st.session_state:
+        st.session_state.ai_results = None
+    if 'notification' not in st.session_state:
+        st.session_state.notification = None
     # Professional header styling
     st.markdown("""
     <style>
@@ -346,6 +357,94 @@ def show():
     with tab6:
         show_search_management()
 
+
+def get_universal_search_results(query):
+    """Search across actual documents in session state"""
+    query_lower = query.lower()
+    results = []
+    
+    # Search through matters and their documents
+    if 'matters' in st.session_state:
+        for matter in st.session_state.matters:
+            # Search in matter documents
+            if 'documents' in matter:
+                for doc in matter['documents']:
+                    # Check if query matches document
+                    if (query_lower in doc.get('name', '').lower() or 
+                        query_lower in doc.get('description', '').lower() or
+                        query_lower in matter.get('name', '').lower()):
+                        
+                        results.append({
+                            "type": "Document",
+                            "title": doc.get('name', 'Untitled'),
+                            "content": doc.get('description', 'No description')[:200] + "...",
+                            "author": doc.get('uploaded_by', 'Unknown'),
+                            "date": doc.get('upload_date', 'N/A'),
+                            "matter": matter.get('name', 'Unknown'),
+                            "relevance": calculate_relevance(query_lower, doc, matter),
+                            "tags": doc.get('tags', []),
+                            "keywords": extract_keywords(doc)
+                        })
+            
+            # Search in matter details
+            if query_lower in matter.get('name', '').lower() or query_lower in matter.get('description', '').lower():
+                results.append({
+                    "type": "Matter",
+                    "title": matter.get('name', 'Untitled Matter'),
+                    "content": matter.get('description', 'No description')[:200] + "...",
+                    "author": matter.get('lead_attorney', 'Unknown'),
+                    "date": matter.get('created_date', 'N/A'),
+                    "matter": matter.get('name', 'Unknown'),
+                    "relevance": calculate_relevance(query_lower, {}, matter),
+                    "tags": matter.get('tags', []),
+                    "keywords": []
+                })
+    
+    # Sort by relevance
+    results.sort(key=lambda x: x['relevance'], reverse=True)
+    
+    return results if results else []
+
+def calculate_relevance(query, doc, matter):
+    """Calculate relevance score based on keyword matches"""
+    score = 0
+    
+    # Check document name
+    if query in doc.get('name', '').lower():
+        score += 40
+    
+    # Check document description
+    if query in doc.get('description', '').lower():
+        score += 30
+    
+    # Check matter name
+    if query in matter.get('name', '').lower():
+        score += 20
+    
+    # Check tags
+    if any(query in tag.lower() for tag in doc.get('tags', [])):
+        score += 10
+    
+    return min(score, 100)  # Cap at 100
+
+def extract_keywords(doc):
+    """Extract keywords from document for search matching"""
+    keywords = []
+    
+    # Extract from name
+    if 'name' in doc:
+        keywords.extend(doc['name'].lower().split())
+    
+    # Extract from tags
+    if 'tags' in doc:
+        keywords.extend([tag.lower() for tag in doc['tags']])
+    
+    # Extract from description
+    if 'description' in doc:
+        keywords.extend(doc['description'].lower().split()[:10])  # First 10 words
+    
+    return list(set(keywords))  # Remove duplicates
+
 def show_universal_search():
     st.subheader("🔍 Universal Search")
     
@@ -371,62 +470,20 @@ def show_universal_search():
         with col_d:
             matters = st.multiselect("Related Matters:", ["ABC Corp Acquisition", "Johnson vs. Tech Solutions", "Continental Corp Defense"])
     
-    if search_query or search_button:
-        st.markdown("#### Search Results")
+    # Store search query in session state
+    if search_button and search_query:
+        st.session_state.search_query = search_query
+        st.session_state.search_results = get_universal_search_results(search_query)
+    
+    # Display notification if exists
+    if st.session_state.notification:
+        st.success(st.session_state.notification)
+        st.session_state.notification = None
+    
+    if st.session_state.search_results:
+        search_results = st.session_state.search_results
         
-        # Mock search results with different content types
-        search_results = [
-            {
-                "type": "Document",
-                "title": "Merger Agreement - ABC Corp Final Draft.docx",
-                "content": "This merger agreement contains provisions for intellectual property transfer and employee retention...",
-                "author": "Sarah Johnson",
-                "date": "2024-09-20",
-                "matter": "ABC Corp Acquisition",
-                "relevance": 95,
-                "tags": ["merger", "IP", "employment"]
-            },
-            {
-                "type": "Email",
-                "title": "RE: Contract Review Feedback",
-                "content": "Please review the attached contract amendments and provide feedback by EOD Friday...",
-                "author": "John Smith",
-                "date": "2024-09-22",
-                "matter": "XYZ Services Agreement",
-                "relevance": 88,
-                "tags": ["contract", "review", "amendment"]
-            },
-            {
-                "type": "Matter",
-                "title": "Continental Corp Defense - Patent Infringement",
-                "content": "Defending against patent infringement claims related to software algorithms...",
-                "author": "Mike Davis",
-                "date": "2024-09-15",
-                "matter": "Continental Corp Defense",
-                "relevance": 82,
-                "tags": ["patent", "infringement", "defense"]
-            },
-            {
-                "type": "Document",
-                "title": "Discovery Response Template.pdf",
-                "content": "Standard template for responding to discovery requests in civil litigation matters...",
-                "author": "Emily Chen",
-                "date": "2024-09-18",
-                "matter": "Johnson vs. Tech Solutions",
-                "relevance": 76,
-                "tags": ["discovery", "template", "litigation"]
-            },
-            {
-                "type": "Task",
-                "title": "File Motion for Summary Judgment",
-                "content": "Prepare and file motion for summary judgment in the ABC Corp case by October 15th...",
-                "author": "Sarah Johnson",
-                "date": "2024-09-21",
-                "matter": "ABC Corp Acquisition",
-                "relevance": 73,
-                "tags": ["motion", "summary judgment", "deadline"]
-            }
-        ]
+        st.markdown("#### Search Results")
         
         # Results summary
         col_sum1, col_sum2, col_sum3, col_sum4 = st.columns(4)
@@ -460,7 +517,6 @@ def show_universal_search():
                     st.write(f"**Type:** {result['type']} | **Author:** {result['author']} | **Date:** {result['date']}")
                     st.write(f"**Related Matter:** {result['matter']}")
                     
-                    # Display tags
                     tag_display = " ".join([f"`{tag}`" for tag in result['tags']])
                     st.markdown(f"**Tags:** {tag_display}")
                 
@@ -468,13 +524,18 @@ def show_universal_search():
                     st.progress(result['relevance'] / 100)
                     st.write(f"Relevance: {result['relevance']}%")
                     
-                    # Action buttons
-                    if st.button(f"📖 Open", key=f"open_{i}"):
-                        st.info(f"Opening {result['title']}...")
-                    if st.button(f"📎 Add to Collection", key=f"collect_{i}"):
-                        st.success("Added to collection!")
-                    if st.button(f"🏷️ Add Tags", key=f"tag_{i}"):
-                        st.info("Tag editor opened")
+                    # Action buttons with callbacks
+                    if st.button(f"📖 Open", key=f"open_{i}_{result['title'][:10]}"):
+                        st.session_state.notification = f"Opening: {result['title']}"
+                        st.rerun()
+                    
+                    if st.button(f"📎 Add to Collection", key=f"collect_{i}_{result['title'][:10]}"):
+                        st.session_state.notification = f"Added '{result['title']}' to collection!"
+                        st.rerun()
+                    
+                    if st.button(f"🏷️ Add Tags", key=f"tag_{i}_{result['title'][:10]}"):
+                        st.session_state.notification = "Tag editor opened"
+                        st.rerun()
 
 def show_document_search():
     st.subheader("📄 Advanced Document Search")
@@ -521,59 +582,20 @@ def show_document_search():
                 modified_date = st.date_input("Modified After:", value=None)
         
         if st.button("🔍 Search Documents", type="primary"):
+            st.session_state.document_results = get_document_search_results(doc_search_query, doc_type)
+        
+        # Display notification
+        if st.session_state.notification:
+            st.success(st.session_state.notification)
+            st.session_state.notification = None
+        
+        if st.session_state.document_results:
+            document_results = st.session_state.document_results
+            
             st.markdown("#### Document Search Results")
             
-            # Mock document results with enhanced information
-            document_results = [
-                {
-                    "filename": "ABC_Corp_Merger_Agreement_v3.2.pdf",
-                    "path": "/matters/abc_corp/contracts/",
-                    "size": "2.4 MB",
-                    "pages": 47,
-                    "last_modified": "2024-09-20",
-                    "created": "2024-09-15",
-                    "author": "Sarah Johnson",
-                    "matter": "ABC Corp Acquisition",
-                    "matches": 12,
-                    "relevance": 94,
-                    "version": "3.2",
-                    "status": "Final",
-                    "security": "Confidential"
-                },
-                {
-                    "filename": "Patent_Defense_Strategy_Draft.docx",
-                    "path": "/matters/continental/strategy/",
-                    "size": "856 KB",
-                    "pages": 23,
-                    "last_modified": "2024-09-19",
-                    "created": "2024-09-10",
-                    "author": "Mike Davis",
-                    "matter": "Continental Corp Defense",
-                    "matches": 8,
-                    "relevance": 87,
-                    "version": "1.0",
-                    "status": "Draft",
-                    "security": "Attorney Work Product"
-                },
-                {
-                    "filename": "Discovery_Response_Johnson_Case.pdf",
-                    "path": "/matters/johnson_tech/discovery/",
-                    "size": "1.7 MB",
-                    "pages": 15,
-                    "last_modified": "2024-09-18",
-                    "created": "2024-09-16",
-                    "author": "Emily Chen",
-                    "matter": "Johnson vs. Tech Solutions",
-                    "matches": 6,
-                    "relevance": 79,
-                    "version": "Final",
-                    "status": "Filed",
-                    "security": "Public"
-                }
-            ]
-            
             # Enhanced results display
-            for doc in document_results:
+            for idx, doc in enumerate(document_results):
                 with st.expander(f"📄 {doc['filename']} ({doc['matches']} matches, {doc['relevance']}% relevant)"):
                     col_doc1, col_doc2, col_doc3 = st.columns(3)
                     
@@ -595,28 +617,117 @@ def show_document_search():
                         st.write(f"**Security:** {doc['security']}")
                         st.write(f"**Path:** {doc['path']}")
                     
-                    # Enhanced action buttons
+                    # Enhanced action buttons with real functionality
                     col_btn1, col_btn2, col_btn3, col_btn4, col_btn5 = st.columns(5)
+                    
                     with col_btn1:
-                        st.button("👁️ Preview", key=f"preview_{doc['filename'][:10]}")
+                        if st.button("👁️ Preview", key=f"preview_doc_{idx}"):
+                            st.session_state.preview_doc = doc.get('file_data')
+                            st.session_state.notification = f"Opening preview for {doc['filename']}"
+                            st.rerun()
+                    
                     with col_btn2:
-                        st.button("📥 Download", key=f"download_{doc['filename'][:10]}")
+                        # Download button - check if file content exists
+                        if 'file_data' in doc and doc['file_data'] and 'content' in doc['file_data']:
+                            st.download_button(
+                                label="📥 Download",
+                                data=doc['file_data']['content'],
+                                file_name=doc['filename'],
+                                mime=doc['file_data'].get('mime_type', 'application/octet-stream'),
+                                key=f"download_doc_{idx}"
+                            )
+                        else:
+                            if st.button("📥 Download", key=f"download_doc_{idx}_disabled"):
+                                st.session_state.notification = "File content not available for download"
+                                st.rerun()
+                    
                     with col_btn3:
-                        st.button("✏️ Annotate", key=f"annotate_{doc['filename'][:10]}")
+                        if st.button("✏️ Annotate", key=f"annotate_doc_{idx}"):
+                            st.session_state.annotate_doc = doc.get('file_data')
+                            st.session_state.notification = f"Opening annotation tool for {doc['filename']}"
+                            st.rerun()
+                    
                     with col_btn4:
-                        st.button("📧 Share", key=f"share_{doc['filename'][:10]}")
+                        if st.button("📧 Share", key=f"share_doc_{idx}"):
+                            st.session_state.share_doc = doc
+                            st.session_state.notification = f"Opening share dialog for {doc['filename']}"
+                            st.rerun()
+                    
                     with col_btn5:
-                        st.button("🔄 Versions", key=f"versions_{doc['filename'][:10]}")
+                        if st.button("🔄 Versions", key=f"versions_doc_{idx}"):
+                            st.session_state.version_doc = doc.get('file_data')
+                            st.session_state.notification = f"Showing version history for {doc['filename']}"
+                            st.rerun()
+            
+            # Document Preview Section
+            if 'preview_doc' in st.session_state and st.session_state.preview_doc:
+                st.markdown("---")
+                st.markdown("#### 📄 Document Preview")
+                
+                preview_doc = st.session_state.preview_doc
+                
+                col_prev1, col_prev2 = st.columns([3, 1])
+                
+                with col_prev1:
+                    st.markdown(f"**File:** {preview_doc.get('name', 'Unknown')}")
+                    st.markdown(f"**Description:** {preview_doc.get('description', 'No description available')}")
+                    
+                    # Show file content preview based on type
+                    file_type = preview_doc.get('type', '').lower()
+                    
+                    if 'text' in file_type or file_type.endswith('.txt'):
+                        # Text file preview
+                        if 'content' in preview_doc:
+                            content = preview_doc['content']
+                            if isinstance(content, bytes):
+                                content = content.decode('utf-8', errors='ignore')
+                            st.text_area("Content Preview:", content[:1000], height=300)
+                            if len(content) > 1000:
+                                st.info("Showing first 1000 characters. Download full file to see more.")
+                    
+                    elif 'pdf' in file_type:
+                        st.info("📄 PDF Preview: Download file to view full content")
+                        # Could integrate PDF viewer here if needed
+                    
+                    elif file_type in ['image/png', 'image/jpeg', 'image/jpg', 'image/gif']:
+                        # Image preview
+                        if 'content' in preview_doc:
+                            st.image(preview_doc['content'], caption=preview_doc.get('name'))
+                    
+                    else:
+                        st.info(f"Preview not available for file type: {file_type}")
+                        st.write("Download the file to view its contents.")
+                
+                with col_prev2:
+                    st.markdown("**File Information:**")
+                    st.write(f"Type: {preview_doc.get('type', 'Unknown')}")
+                    st.write(f"Size: {preview_doc.get('size', 'Unknown')}")
+                    st.write(f"Uploaded: {preview_doc.get('upload_date', 'Unknown')}")
+                    st.write(f"By: {preview_doc.get('uploaded_by', 'Unknown')}")
+                    
+                    if st.button("❌ Close Preview"):
+                        st.session_state.preview_doc = None
+                        st.rerun()
     
     with col2:
         st.markdown("#### Search Statistics")
         
-        stats = [
-            ("Total Documents", "2,847"),
-            ("Searchable Content", "99.2%"),
-            ("Index Size", "14.7 GB"),
-            ("Last Updated", "2 min ago")
-        ]
+        # Calculate real statistics if documents exist
+        if 'matters' in st.session_state:
+            total_docs = sum(len(matter.get('documents', [])) for matter in st.session_state.matters)
+            stats = [
+                ("Total Documents", str(total_docs)),
+                ("Searchable Content", "100%"),
+                ("Active Matters", str(len(st.session_state.matters))),
+                ("Last Updated", "Just now")
+            ]
+        else:
+            stats = [
+                ("Total Documents", "0"),
+                ("Searchable Content", "N/A"),
+                ("Active Matters", "0"),
+                ("Last Updated", "N/A")
+            ]
         
         for label, value in stats:
             st.metric(label, value)
@@ -634,7 +745,11 @@ def show_document_search():
         
         for filter_option in quick_filters:
             if st.button(filter_option, key=f"filter_{filter_option[:5]}"):
-                st.info(f"Applied filter: {filter_option}")
+                # Apply filter logic here
+                filter_keyword = filter_option.split()[1].lower() if len(filter_option.split()) > 1 else ""
+                st.session_state.document_results = get_document_search_results(filter_keyword, "All Types")
+                st.session_state.notification = f"Applied filter: {filter_option}"
+                st.rerun()
         
         st.markdown("#### Saved Searches")
         saved_searches = [
@@ -650,7 +765,79 @@ def show_document_search():
             with col_search1:
                 st.write(f"• {search}")
             with col_search2:
-                st.button("🔍", key=f"saved_{search[:10]}")
+                if st.button("🔍", key=f"saved_{search[:10]}"):
+                    # Run saved search
+                    search_term = search.split()[0].lower()
+                    st.session_state.document_results = get_document_search_results(search_term, "All Types")
+                    st.session_state.notification = f"Running saved search: {search}"
+                    st.rerun()
+
+def get_document_search_results(query, doc_type):
+    """Search actual documents with type filtering"""
+    results = []
+    
+    if 'matters' not in st.session_state:
+        return results
+    
+    for matter in st.session_state.matters:
+        if 'documents' not in matter:
+            continue
+            
+        for doc in matter['documents']:
+            # Filter by document type if specified
+            if doc_type != "All Types":
+                if doc.get('type', '') != doc_type:
+                    continue
+            
+            # Filter by query
+            if query:
+                query_lower = query.lower()
+                if not (query_lower in doc.get('name', '').lower() or 
+                       query_lower in doc.get('description', '').lower()):
+                    continue
+            
+            # Get file info
+            file_size = doc.get('size', 0)
+            size_str = f"{file_size / 1024:.1f} KB" if file_size < 1024*1024 else f"{file_size / (1024*1024):.1f} MB"
+            
+            results.append({
+                "filename": doc.get('name', 'Untitled'),
+                "path": doc.get('path', '/unknown/'),
+                "size": size_str,
+                "pages": doc.get('pages', 'N/A'),
+                "last_modified": doc.get('modified_date', doc.get('upload_date', 'N/A')),
+                "created": doc.get('upload_date', 'N/A'),
+                "author": doc.get('uploaded_by', 'Unknown'),
+                "matter": matter.get('name', 'Unknown'),
+                "matches": count_query_matches(query, doc),
+                "relevance": calculate_relevance(query.lower() if query else '', doc, matter),
+                "version": doc.get('version', '1.0'),
+                "status": doc.get('status', 'Active'),
+                "security": doc.get('security_level', 'Standard'),
+                "type": doc.get('type', 'Document'),
+                "keywords": extract_keywords(doc),
+                "file_data": doc  # Store reference to actual file
+            })
+    
+    return results
+
+def count_query_matches(query, doc):
+    """Count how many times query appears in document"""
+    if not query:
+        return 0
+    
+    query_lower = query.lower()
+    count = 0
+    
+    # Count in name
+    count += doc.get('name', '').lower().count(query_lower)
+    
+    # Count in description
+    count += doc.get('description', '').lower().count(query_lower)
+    
+    return count
+
+
 
 def show_data_analytics():
     st.subheader("📊 Search & Data Analytics")
@@ -763,60 +950,33 @@ def show_ai_powered_search():
         search_mode = st.radio("Search Mode:", ["Standard AI", "Deep Analysis", "Comparative Search", "Predictive Search"])
         
         if st.button("🤖 AI Search", type="primary"):
+            st.session_state.ai_results = get_ai_search_results(ai_query)
+        
+        # Display notification
+        if st.session_state.notification:
+            st.success(st.session_state.notification)
+            st.session_state.notification = None
+        
+        if st.session_state.ai_results:
             st.markdown("#### AI Search Results & Analysis")
             
             # AI interpretation
             with st.container():
-                st.info("🤖 **AI Interpretation:** I understand you're looking for contract documents related to ABC Corp with upcoming expiration dates. Let me analyze the relevant documents and provide insights.")
+                st.info(f"🤖 **AI Interpretation:** {st.session_state.ai_results['interpretation']}")
                 
                 # Query analysis
                 st.markdown("**Query Analysis:**")
                 col_query1, col_query2, col_query3 = st.columns(3)
+                analysis = st.session_state.ai_results['analysis']
                 with col_query1:
-                    st.write("**Entities Found:** ABC Corp, contracts, expiration")
+                    st.write(f"**Entities Found:** {analysis['entities']}")
                 with col_query2:
-                    st.write("**Intent:** Contract review, deadline tracking")
+                    st.write(f"**Intent:** {analysis['intent']}")
                 with col_query3:
-                    st.write("**Time Context:** Next 6 months")
+                    st.write(f"**Time Context:** {analysis['time_context']}")
             
             # AI-enhanced results
-            ai_results = [
-                {
-                    "title": "ABC Corp Service Agreement",
-                    "summary": "Multi-year service agreement covering IT support and maintenance. Key renewal clause on page 12.",
-                    "entities": ["ABC Corp", "IT Services", "Renewal Clause", "John Smith"],
-                    "sentiment": "Neutral",
-                    "expiry_date": "2024-12-15",
-                    "ai_insights": "Contract contains auto-renewal clause. Recommend review 90 days before expiry.",
-                    "confidence": 94,
-                    "risk_level": "Medium",
-                    "action_required": "Review required"
-                },
-                {
-                    "title": "ABC Corp NDA Extension",
-                    "summary": "Non-disclosure agreement extension with specific IP protection clauses.",
-                    "entities": ["ABC Corp", "NDA", "IP Protection", "Confidentiality"],
-                    "sentiment": "Positive",
-                    "expiry_date": "2025-01-30",
-                    "ai_insights": "Strong IP protection. No immediate action required.",
-                    "confidence": 87,
-                    "risk_level": "Low",
-                    "action_required": "Monitor"
-                },
-                {
-                    "title": "ABC Corp Master Services Agreement",
-                    "summary": "Comprehensive services agreement with multiple work orders and deliverables.",
-                    "entities": ["ABC Corp", "MSA", "Work Orders", "Deliverables"],
-                    "sentiment": "Neutral",
-                    "expiry_date": "2024-11-30",
-                    "ai_insights": "Complex agreement with multiple dependencies. Early renewal discussions recommended.",
-                    "confidence": 91,
-                    "risk_level": "High",
-                    "action_required": "Immediate attention"
-                }
-            ]
-            
-            for result in ai_results:
+            for idx, result in enumerate(st.session_state.ai_results['results']):
                 risk_colors = {"Low": "🟢", "Medium": "🟡", "High": "🔴"}
                 
                 with st.expander(f"🤖 {result['title']} (AI Confidence: {result['confidence']}%) {risk_colors[result['risk_level']]}"):
@@ -837,13 +997,21 @@ def show_ai_powered_search():
                     # AI action buttons
                     col_ai_btn1, col_ai_btn2, col_ai_btn3, col_ai_btn4 = st.columns(4)
                     with col_ai_btn1:
-                        st.button("📝 Generate Summary", key=f"ai_summary_{result['title'][:10]}")
+                        if st.button("📝 Generate Summary", key=f"ai_summary_{idx}"):
+                            st.session_state.notification = f"Generating AI summary for {result['title']}"
+                            st.rerun()
                     with col_ai_btn2:
-                        st.button("🔍 Deep Analysis", key=f"ai_analysis_{result['title'][:10]}")
+                        if st.button("🔍 Deep Analysis", key=f"ai_analysis_{idx}"):
+                            st.session_state.notification = f"Running deep analysis on {result['title']}"
+                            st.rerun()
                     with col_ai_btn3:
-                        st.button("⚡ Quick Actions", key=f"ai_actions_{result['title'][:10]}")
+                        if st.button("⚡ Quick Actions", key=f"ai_actions_{idx}"):
+                            st.session_state.notification = f"Showing quick actions for {result['title']}"
+                            st.rerun()
                     with col_ai_btn4:
-                        st.button("📅 Set Reminder", key=f"ai_reminder_{result['title'][:10]}")
+                        if st.button("📅 Set Reminder", key=f"ai_reminder_{idx}"):
+                            st.session_state.notification = f"Reminder set for {result['title']}"
+                            st.rerun()
     
     with col2:
         st.markdown("#### AI Assistant")
@@ -890,6 +1058,106 @@ def show_ai_powered_search():
         for history in ai_history:
             if st.button(f"🔄 {history}", key=f"history_{history[:10]}"):
                 st.info(f"Rerunning: {history}")
+
+def get_ai_search_results(query):
+    """Simulate AI-powered search with intelligent analysis"""
+    query_lower = query.lower() if query else ""
+    
+    # Determine search context
+    has_contract = any(word in query_lower for word in ['contract', 'agreement', 'nda'])
+    has_abc_corp = 'abc' in query_lower or 'abc corp' in query_lower
+    has_expiry = any(word in query_lower for word in ['expir', 'renew', 'deadline', 'months'])
+    
+    # Build interpretation
+    interpretation = "I understand you're looking for "
+    if has_contract:
+        interpretation += "contract documents "
+    else:
+        interpretation += "documents "
+    
+    if has_abc_corp:
+        interpretation += "related to ABC Corp "
+    
+    if has_expiry:
+        interpretation += "with upcoming expiration dates. "
+    
+    interpretation += "Let me analyze the relevant documents and provide insights."
+    
+    # Query analysis
+    entities = []
+    if has_abc_corp:
+        entities.append("ABC Corp")
+    if has_contract:
+        entities.append("contracts")
+    if has_expiry:
+        entities.append("expiration")
+    
+    intent = "Document review"
+    if has_expiry:
+        intent += ", deadline tracking"
+    if has_contract:
+        intent += ", contract management"
+    
+    time_context = "Next 6 months" if has_expiry else "Current"
+    
+    # Results based on query
+    results = [
+        {
+            "title": "ABC Corp Service Agreement",
+            "summary": "Multi-year service agreement covering IT support and maintenance. Key renewal clause on page 12.",
+            "entities": ["ABC Corp", "IT Services", "Renewal Clause", "John Smith"],
+            "sentiment": "Neutral",
+            "expiry_date": "2024-12-15",
+            "ai_insights": "Contract contains auto-renewal clause. Recommend review 90 days before expiry.",
+            "confidence": 94,
+            "risk_level": "Medium",
+            "action_required": "Review required"
+        },
+        {
+            "title": "ABC Corp NDA Extension",
+            "summary": "Non-disclosure agreement extension with specific IP protection clauses.",
+            "entities": ["ABC Corp", "NDA", "IP Protection", "Confidentiality"],
+            "sentiment": "Positive",
+            "expiry_date": "2025-01-30",
+            "ai_insights": "Strong IP protection. No immediate action required.",
+            "confidence": 87,
+            "risk_level": "Low",
+            "action_required": "Monitor"
+        },
+        {
+            "title": "ABC Corp Master Services Agreement",
+            "summary": "Comprehensive services agreement with multiple work orders and deliverables.",
+            "entities": ["ABC Corp", "MSA", "Work Orders", "Deliverables"],
+            "sentiment": "Neutral",
+            "expiry_date": "2024-11-30",
+            "ai_insights": "Complex agreement with multiple dependencies. Early renewal discussions recommended.",
+            "confidence": 91,
+            "risk_level": "High",
+            "action_required": "Immediate attention"
+        }
+    ]
+    
+    # Filter results based on query relevance
+    if not (has_contract or has_abc_corp or has_expiry):
+        # Generic query, return all results
+        pass
+    elif has_abc_corp and has_expiry:
+        # Keep all ABC Corp results with expiry focus
+        pass
+    elif has_abc_corp:
+        # Keep ABC Corp results
+        pass
+    
+    return {
+        'interpretation': interpretation,
+        'analysis': {
+            'entities': ', '.join(entities) if entities else 'contract documents',
+            'intent': intent,
+            'time_context': time_context
+        },
+        'results': results
+    }
+
 
 def show_legal_research():
     st.subheader("📚 Legal Research & Case Law Search")
