@@ -4,6 +4,52 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
 from types import SimpleNamespace
+import json
+import os
+
+# Data persistence functions
+DATA_DIR = "user_data"
+
+def ensure_data_dir():
+    """Ensure data directory exists"""
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+
+def get_user_file(user_email, data_type):
+    """Get file path for user data"""
+    ensure_data_dir()
+    safe_email = user_email.replace('@', '_at_').replace('.', '_')
+    return os.path.join(DATA_DIR, f"{safe_email}_{data_type}.json")
+
+def save_user_data(user_email, data_type, data):
+    """Save user data to file"""
+    file_path = get_user_file(user_email, data_type)
+    with open(file_path, 'w') as f:
+        json.dump(data, f, default=str)
+
+def load_user_data(user_email, data_type, default=None):
+    """Load user data from file"""
+    file_path = get_user_file(user_email, data_type)
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    return default if default is not None else []
+
+def auto_save_user_data():
+    """Automatically save all user data"""
+    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
+    
+    if 'time_entries' in st.session_state:
+        save_user_data(user_email, 'time_entries', st.session_state.time_entries)
+    
+    if 'invoices' in st.session_state:
+        save_user_data(user_email, 'invoices', st.session_state.invoices)
+    
+    if 'matters' in st.session_state:
+        save_user_data(user_email, 'matters', st.session_state.matters)
+    
+    if 'billing_settings' in st.session_state:
+        save_user_data(user_email, 'billing_settings', st.session_state.billing_settings)
 
 def dict_to_obj(d):
     """Convert dict to SimpleNamespace object"""
@@ -113,8 +159,6 @@ def show():
     [data-testid="stExpander"] [data-testid="stExpanderDetails"] * {
         color: #1e293b !important;
     }
-    
-    /* ADD THESE NEW RULES: */
     
     /* Query Suggestions - white boxes with dark text */
     .element-container:has(.stButton) {
@@ -249,8 +293,6 @@ def show():
         background-color: rgba(59, 130, 246, 0.8);
         color: white;
     }
-    
-
     </style>
     <div class="ai-header">
         <h1>💰 Time & Billing</h1>
@@ -258,30 +300,45 @@ def show():
     </div>
     """, unsafe_allow_html=True)
     
-    # Initialize session state for time entries and invoices
+    # GET USER EMAIL FOR DATA PERSISTENCE
+    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
+    
+    # LOAD REAL USER DATA (NO MOCK DATA)
     if 'time_entries' not in st.session_state:
-        st.session_state.time_entries = load_sample_time_entries()
+        st.session_state.time_entries = load_user_data(user_email, 'time_entries', [])
     
     if 'invoices' not in st.session_state:
-        st.session_state.invoices = load_sample_invoices()
-
-    # Initialize session state for time entries and invoices
-    if 'time_entries' not in st.session_state:
-        st.session_state.time_entries = load_sample_time_entries()
+        st.session_state.invoices = load_user_data(user_email, 'invoices', [])
     
-    if 'invoices' not in st.session_state:
-        st.session_state.invoices = load_sample_invoices()
-    
-    # ADD THIS: Initialize matters for dropdown
     if 'matters' not in st.session_state:
-        st.session_state.matters = [
-            {'name': 'Johnson Custody Case', 'client': 'Johnson Family', 'status': 'Active'},
-            {'name': 'Smith Contract Dispute', 'client': 'Smith Corp', 'status': 'Active'},
-            {'name': 'TechCorp Merger', 'client': 'TechCorp Industries', 'status': 'Active'},
-            {'name': 'Anderson Real Estate', 'client': 'Anderson Real Estate LLC', 'status': 'Active'},
-            {'name': 'Williams Estate Planning', 'client': 'Williams Family Trust', 'status': 'Active'},
-            {'name': 'Davis Employment Case', 'client': 'Davis Enterprises', 'status': 'Active'}
-        ]
+        # Load matters from matters.py if available, otherwise empty list
+        st.session_state.matters = load_user_data(user_email, 'matters', [])
+    
+    if 'billing_settings' not in st.session_state:
+        st.session_state.billing_settings = load_user_data(user_email, 'billing_settings', {
+            'default_rate': 250.0,
+            'paralegal_rate': 150.0,
+            'associate_rate': 300.0,
+            'partner_rate': 450.0,
+            'senior_partner_rate': 600.0,
+            'court_appearance_rate': 500.0,
+            'firm_name': '',
+            'firm_address': '',
+            'firm_phone': '',
+            'firm_email': '',
+            'invoice_prefix': 'INV',
+            'payment_terms': 'Net 30',
+            'include_tax': False,
+            'tax_rate': 0.0,
+            'invoice_footer': 'Thank you for your business.',
+            'accept_check': True,
+            'accept_wire': True,
+            'accept_credit': True,
+            'accept_ach': True,
+            'charge_late_fees': False,
+            'late_fee_percent': 1.5,
+            'grace_period': 5
+        })
     
     # Quick stats at the top
     show_billing_metrics()
@@ -324,29 +381,29 @@ def show_billing_metrics():
     # Calculate metrics using getattr() and handle datetime objects
     this_month_hours = sum(
         getattr(entry, 'hours', 0) for entry in time_entries
-        if isinstance(getattr(entry, 'date', None), datetime) and 
-           getattr(entry, 'date').month == current_month and
-           getattr(entry, 'date').year == current_year
+        if isinstance(getattr(entry, 'date', None), str) and 
+           datetime.strptime(getattr(entry, 'date'), '%Y-%m-%d').month == current_month and
+           datetime.strptime(getattr(entry, 'date'), '%Y-%m-%d').year == current_year
     )
     
     this_month_revenue = sum(
-        getattr(entry, 'hours', 0) * getattr(entry, 'billable_rate', getattr(entry, 'rate', 0))
+        getattr(entry, 'hours', 0) * getattr(entry, 'rate', 0)
         for entry in time_entries
-        if isinstance(getattr(entry, 'date', None), datetime) and 
-           getattr(entry, 'date').month == current_month and
-           getattr(entry, 'date').year == current_year
+        if isinstance(getattr(entry, 'date', None), str) and 
+           datetime.strptime(getattr(entry, 'date'), '%Y-%m-%d').month == current_month and
+           datetime.strptime(getattr(entry, 'date'), '%Y-%m-%d').year == current_year
     )
     
     total_unbilled_hours = sum(
         getattr(entry, 'hours', 0) for entry in time_entries 
-        if getattr(entry, 'status', None) == "draft" and 
+        if not getattr(entry, 'billed', False) and 
            getattr(entry, 'billable', False)
     )
     
     total_unbilled_revenue = sum(
-        getattr(entry, 'hours', 0) * getattr(entry, 'billable_rate', getattr(entry, 'rate', 0))
+        getattr(entry, 'hours', 0) * getattr(entry, 'rate', 0)
         for entry in time_entries 
-        if getattr(entry, 'status', None) == "draft" and 
+        if not getattr(entry, 'billed', False) and 
            getattr(entry, 'billable', False)
     )
     
@@ -366,6 +423,13 @@ def show_time_tracking():
     """Time tracking interface"""
     
     st.markdown("### ⏱️ Time Entry")
+    
+    # Check if user has matters
+    if not st.session_state.matters:
+        st.warning("⚠️ You don't have any matters yet. Please create a matter in the Matter Management page first.")
+        if st.button("Go to Matter Management"):
+            st.switch_page("pages/matters.py")
+        return
     
     # Quick timer at the top
     col_timer1, col_timer2 = st.columns([2, 1])
@@ -440,20 +504,48 @@ def show_time_tracking():
             
             final_hours = round(final_seconds / 3600, 2)
             
-            # Store timer data
-            st.session_state.timer_hours = final_hours
-            st.session_state.timer_matter = st.session_state.get('timer_matter_select', 'Select matter...')
-            st.session_state.timer_activity_type = st.session_state.get('timer_activity_select', 'Other')
-            st.session_state.timer_desc_text = st.session_state.get('timer_desc', '')
-            st.session_state.timer_stopped = True
+            # Get current timer data
+            timer_matter = st.session_state.get('timer_matter_select', 'Select matter...')
+            timer_activity = st.session_state.get('timer_activity_select', 'Other')
+            timer_desc = st.session_state.get('timer_desc', '')
             
-            # Reset timer
-            st.session_state.timer_running = False
-            st.session_state.timer_start = None
-            st.session_state.timer_paused_time = 0
-            
-            st.success(f"✓ Timer stopped! {final_hours} hours recorded. Review details below.")
-            st.rerun()
+            # Validate data
+            if timer_matter != "Select matter..." and final_hours > 0:
+                # Get default rate from settings
+                default_rate = st.session_state.billing_settings.get('default_rate', 250.0)
+                
+                # Save time entry immediately
+                new_entry = {
+                    'id': len(st.session_state.time_entries) + 1,
+                    'date': datetime.now().strftime('%Y-%m-%d'),
+                    'matter': timer_matter,
+                    'activity': timer_activity,
+                    'description': timer_desc if timer_desc else f"Timer entry - {timer_activity}",
+                    'hours': final_hours,
+                    'rate': default_rate,
+                    'amount': final_hours * default_rate,
+                    'billable': True,
+                    'billed': False,
+                    'user': st.session_state.get('user_data', {}).get('name', 'User')
+                }
+                
+                st.session_state.time_entries.append(new_entry)
+                auto_save_user_data()
+                
+                # Reset timer
+                st.session_state.timer_running = False
+                st.session_state.timer_start = None
+                st.session_state.timer_paused_time = 0
+                
+                st.success(f"✅ Timer saved! {final_hours} hours added to {timer_matter}")
+                st.rerun()
+            else:
+                st.error("⚠️ Please select a matter before saving timer")
+                # Reset timer anyway
+                st.session_state.timer_running = False
+                st.session_state.timer_start = None
+                st.session_state.timer_paused_time = 0
+                st.rerun()
     
     # Auto-refresh timer display when running
     if st.session_state.timer_running:
@@ -484,13 +576,14 @@ def show_time_tracking():
         ], key="timer_activity_select")
     
     timer_description = st.text_input("Quick description (optional)", key="timer_desc", placeholder="What are you working on?")
+    
     # Manual time entry form
     st.markdown("### 📝 Manual Time Entry")
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Get matters for dropdown - use get_attr helper
+        # Get matters for dropdown
         matters = st.session_state.get('matters', [])
         matter_options = ["Select a matter..."] + [get_attr(m, 'name', 'Untitled') for m in matters]
         
@@ -502,12 +595,10 @@ def show_time_tracking():
             with col_form1:
                 entry_date = st.date_input("Date", datetime.now())
                 
-                # Pre-fill hours from timer if available
-                default_hours = st.session_state.get('timer_hours', 1.0)
-                if st.session_state.get('timer_stopped', False):
-                    st.info(f"⏱️ Timer recorded: {default_hours} hours")
+                # Get default rate from settings
+                default_rate = st.session_state.billing_settings.get('default_rate', 250.0)
                 
-                hours = st.number_input("Hours", min_value=0.0, max_value=24.0, step=0.25, value=default_hours)
+                hours = st.number_input("Hours", min_value=0.0, max_value=24.0, step=0.25, value=1.0)
             
             with col_form2:
                 activity_type = st.selectbox("Activity Type", [
@@ -521,7 +612,7 @@ def show_time_tracking():
                     "Travel",
                     "Other"
                 ])
-                rate = st.number_input("Hourly Rate ($)", min_value=0.0, step=25.0, value=250.0)
+                rate = st.number_input("Hourly Rate ($)", min_value=0.0, step=25.0, value=default_rate)
             
             description = st.text_area("Description", placeholder="Describe the work performed...")
             
@@ -547,16 +638,11 @@ def show_time_tracking():
                         'amount': hours * rate,
                         'billable': billable,
                         'billed': False,
-                        'user': st.session_state.get('user_data', {}).get('name', 'Demo User')
+                        'user': st.session_state.get('user_data', {}).get('name', 'User')
                     }
                     
                     st.session_state.time_entries.append(new_entry)
-                    
-                    # Clear timer flags
-                    if 'timer_hours' in st.session_state:
-                        del st.session_state.timer_hours
-                    if 'timer_stopped' in st.session_state:
-                        del st.session_state.timer_stopped
+                    auto_save_user_data()
                     
                     st.success(f"✅ Time entry saved: {hours} hours for {selected_matter}")
                     st.rerun()
@@ -614,51 +700,159 @@ def show_time_tracking():
         entries_data = []
         for e in filtered_entries:
             entries_data.append({
-                'date': get_attr(e, 'date', ''),
-                'matter': get_attr(e, 'matter', ''),
-                'activity': get_attr(e, 'activity', ''),
-                'description': get_attr(e, 'description', ''),
-                'hours': get_attr(e, 'hours', 0),
-                'rate': get_attr(e, 'rate', 0),
-                'amount': get_attr(e, 'amount', 0),
-                'billed': get_attr(e, 'billed', False)
+                'Date': get_attr(e, 'date', ''),
+                'Matter': get_attr(e, 'matter', ''),
+                'Activity': get_attr(e, 'activity', ''),
+                'Description': get_attr(e, 'description', ''),
+                'Hours': get_attr(e, 'hours', 0),
+                'Rate': get_attr(e, 'rate', 0),
+                'Amount': get_attr(e, 'amount', 0),
+                'Billed': '✓' if get_attr(e, 'billed', False) else '✗'
             })
         
         df = pd.DataFrame(entries_data)
-        df = df.sort_values('date', ascending=False)
+        df = df.sort_values('Date', ascending=False)
         
         # Style the dataframe
         st.dataframe(
             df,
             use_container_width=True,
-            hide_index=True,
-            column_config={
-                "date": st.column_config.DateColumn("Date", format="MMM DD, YYYY"),
-                "matter": "Matter",
-                "activity": "Activity",
-                "description": st.column_config.TextColumn("Description", width="large"),
-                "hours": st.column_config.NumberColumn("Hours", format="%.2f"),
-                "rate": st.column_config.NumberColumn("Rate", format="$%.2f"),
-                "amount": st.column_config.NumberColumn("Amount", format="$%.2f"),
-                "billed": st.column_config.CheckboxColumn("Billed")
-            }
+            hide_index=True
         )
         
         # Summary
-        total_hours = df['hours'].sum()
-        total_amount = df['amount'].sum()
+        total_hours = sum(get_attr(e, 'hours', 0) for e in filtered_entries)
+        total_amount = sum(get_attr(e, 'amount', 0) for e in filtered_entries)
         
         st.markdown(f"""
         **Summary:** {len(df)} entries | {total_hours:.1f} hours | ${total_amount:,.2f}
         """)
     else:
-        st.info("No time entries found matching your filters.")
+        st.info("No time entries found. Start tracking your time above!")
 
 def show_invoice_generator():
     """Invoice generation interface"""
     
     st.markdown("### 📄 Generate New Invoice")
-    st.info("Invoice generation feature - Select client to see unbilled time entries")
+    
+    # Get unbilled time entries
+    unbilled_entries = [e for e in st.session_state.time_entries 
+                       if get_attr(e, 'billable', False) and not get_attr(e, 'billed', False)]
+    
+    if not unbilled_entries:
+        st.info("💡 No unbilled time entries available. Log billable time in the Time Tracking tab first.")
+        return
+    
+    # Group by matter
+    matters_with_unbilled = {}
+    for entry in unbilled_entries:
+        matter = get_attr(entry, 'matter', 'Unknown')
+        if matter not in matters_with_unbilled:
+            matters_with_unbilled[matter] = []
+        matters_with_unbilled[matter].append(entry)
+    
+    # Invoice form
+    with st.form("invoice_generator_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            selected_client = st.selectbox("Select Client/Matter", list(matters_with_unbilled.keys()))
+            invoice_date = st.date_input("Invoice Date", datetime.now())
+            due_date = st.date_input("Due Date", datetime.now() + timedelta(days=30))
+        
+        with col2:
+            payment_terms = st.selectbox("Payment Terms", 
+                ["Net 30", "Net 15", "Due on Receipt", "Net 60"],
+                index=0 if st.session_state.billing_settings.get('payment_terms') == 'Net 30' else 0)
+            invoice_notes = st.text_area("Invoice Notes", 
+                value=st.session_state.billing_settings.get('invoice_footer', 'Thank you for your business.'),
+                placeholder="Thank you for your business...")
+            discount_percent = st.number_input("Discount (%)", min_value=0.0, max_value=100.0, step=5.0, value=0.0)
+        
+        # Show unbilled entries for selected client
+        st.markdown("#### Unbilled Time Entries")
+        
+        selected_entries = matters_with_unbilled.get(selected_client, [])
+        
+        if selected_entries:
+            # Create selection checkboxes
+            st.markdown("Select entries to include:")
+            selected_entry_ids = []
+            
+            for entry in selected_entries:
+                entry_id = get_attr(entry, 'id', 0)
+                entry_date = get_attr(entry, 'date', '')
+                entry_activity = get_attr(entry, 'activity', '')
+                entry_hours = get_attr(entry, 'hours', 0)
+                entry_amount = get_attr(entry, 'amount', 0)
+                entry_desc = get_attr(entry, 'description', '')
+                
+                include = st.checkbox(
+                    f"{entry_date} - {entry_activity} ({entry_hours}h) - ${entry_amount:.2f}",
+                    value=True,
+                    key=f"entry_{entry_id}"
+                )
+                
+                if include:
+                    selected_entry_ids.append(entry_id)
+                    st.caption(entry_desc)
+            
+            # Calculate totals
+            subtotal = sum(get_attr(e, 'amount', 0) for e in selected_entries if get_attr(e, 'id', 0) in selected_entry_ids)
+            discount_amount = subtotal * (discount_percent / 100)
+            total = subtotal - discount_amount
+            
+            st.markdown("---")
+            col_total1, col_total2 = st.columns([3, 1])
+            
+            with col_total2:
+                st.metric("Subtotal", f"${subtotal:.2f}")
+                if discount_amount > 0:
+                    st.metric("Discount", f"-${discount_amount:.2f}")
+                st.metric("**Total**", f"**${total:.2f}**")
+        
+        # Generate button
+        if st.form_submit_button("📄 Generate Invoice", type="primary", use_container_width=True):
+            if not selected_entry_ids:
+                st.error("Please select at least one time entry")
+            else:
+                # Create invoice
+                invoice_prefix = st.session_state.billing_settings.get('invoice_prefix', 'INV')
+                invoice_number = f"{invoice_prefix}-{datetime.now().strftime('%Y%m%d')}-{len(st.session_state.invoices) + 1:03d}"
+                
+                new_invoice = {
+                    'id': len(st.session_state.invoices) + 1,
+                    'invoice_number': invoice_number,
+                    'client': selected_client,
+                    'date': invoice_date.strftime('%Y-%m-%d'),
+                    'due_date': due_date.strftime('%Y-%m-%d'),
+                    'subtotal': subtotal,
+                    'discount': discount_amount,
+                    'total': total,
+                    'status': 'draft',
+                    'payment_terms': payment_terms,
+                    'notes': invoice_notes,
+                    'entries': selected_entry_ids
+                }
+                
+                st.session_state.invoices.append(new_invoice)
+                
+                # Mark entries as billed
+                for entry in st.session_state.time_entries:
+                    if get_attr(entry, 'id', 0) in selected_entry_ids:
+                        if isinstance(entry, dict):
+                            entry['billed'] = True
+                        else:
+                            entry.billed = True
+                
+                auto_save_user_data()
+                
+                st.success(f"✅ Invoice {invoice_number} created successfully!")
+                st.balloons()
+                
+                # Show download option
+                st.info("💡 View your invoice in the 'Invoices' tab")
+                st.rerun()
 
 def show_invoices_list():
     """Display list of invoices"""
@@ -668,8 +862,16 @@ def show_invoices_list():
     invoices = st.session_state.invoices
     
     if not invoices:
-        st.info("No invoices yet. Generate your first invoice in the 'Generate Invoice' tab!")
+        st.info("📄 No invoices yet. Generate your first invoice in the 'Generate Invoice' tab!")
         return
+    
+    # Invoice actions
+    col_action1, col_action2 = st.columns([3, 1])
+    with col_action2:
+        if st.button("➕ New Invoice"):
+            st.info("Go to 'Generate Invoice' tab to create a new invoice")
+    
+    st.markdown("---")
     
     # Display invoices
     for invoice in sorted(invoices, key=lambda x: get_attr(x, 'date', ''), reverse=True):
@@ -683,224 +885,376 @@ def show_invoices_list():
         status = get_attr(invoice, 'status', 'draft')
         status_color = status_colors.get(status, '#6c757d')
         
-        col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
-        
-        with col1:
-            st.markdown(f"**{get_attr(invoice, 'invoice_number', 'N/A')}**")
-            st.caption(get_attr(invoice, 'client', 'Unknown'))
-        
-        with col2:
-            st.write(f"Date: {get_attr(invoice, 'date', 'N/A')}")
-            st.caption(f"Due: {get_attr(invoice, 'due_date', 'N/A')}")
-        
-        with col3:
-            st.markdown(f"""
-            <span style="
-                background: {status_color};
-                color: white;
-                padding: 0.25rem 0.75rem;
-                border-radius: 12px;
-                font-size: 0.85rem;
-                font-weight: 600;
-            ">{status.upper()}</span>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            st.metric("Total", f"${get_attr(invoice, 'total', 0):,.2f}")
-        
-        st.markdown("---")
+        with st.expander(f"📄 {get_attr(invoice, 'invoice_number', 'N/A')} - {get_attr(invoice, 'client', 'Unknown')} - ${get_attr(invoice, 'total', 0):,.2f}"):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown(f"**Invoice:** {get_attr(invoice, 'invoice_number', 'N/A')}")
+                st.markdown(f"**Client:** {get_attr(invoice, 'client', 'Unknown')}")
+                st.markdown(f"**Date:** {get_attr(invoice, 'date', 'N/A')}")
+            
+            with col2:
+                st.markdown(f"**Due Date:** {get_attr(invoice, 'due_date', 'N/A')}")
+                st.markdown(f"**Terms:** {get_attr(invoice, 'payment_terms', 'N/A')}")
+                st.markdown(f"""**Status:** <span style="background: {status_color}; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem;">{status.upper()}</span>""", unsafe_allow_html=True)
+            
+            with col3:
+                st.metric("Subtotal", f"${get_attr(invoice, 'subtotal', 0):,.2f}")
+                if get_attr(invoice, 'discount', 0) > 0:
+                    st.metric("Discount", f"-${get_attr(invoice, 'discount', 0):,.2f}")
+                st.metric("**Total**", f"**${get_attr(invoice, 'total', 0):,.2f}**")
+            
+            # Invoice actions
+            col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
+            
+            with col_btn1:
+                if st.button("📧 Send", key=f"send_{get_attr(invoice, 'id')}"):
+                    if isinstance(invoice, dict):
+                        invoice['status'] = 'sent'
+                    else:
+                        invoice.status = 'sent'
+                    auto_save_user_data()
+                    st.success("Invoice marked as sent!")
+                    st.rerun()
+            
+            with col_btn2:
+                if st.button("✅ Mark Paid", key=f"paid_{get_attr(invoice, 'id')}"):
+                    if isinstance(invoice, dict):
+                        invoice['status'] = 'paid'
+                    else:
+                        invoice.status = 'paid'
+                    auto_save_user_data()
+                    st.success("Invoice marked as paid!")
+                    st.rerun()
+            
+            with col_btn3:
+                if st.button("📥 Download PDF", key=f"download_{get_attr(invoice, 'id')}"):
+                    st.info("PDF download feature coming soon!")
+            
+            with col_btn4:
+                if st.button("🗑️ Delete", key=f"delete_{get_attr(invoice, 'id')}"):
+                    st.session_state.invoices.remove(invoice)
+                    auto_save_user_data()
+                    st.success("Invoice deleted!")
+                    st.rerun()
 
 def show_billing_reports():
     """Display billing reports and analytics"""
     
     st.markdown("### 📊 Billing Reports & Analytics")
-    st.info("Comprehensive billing analytics and reports coming soon!")
+    
+    if not st.session_state.time_entries:
+        st.info("📈 No data yet. Start logging time to see reports!")
+        return
+    
+    # Date range selector
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        report_period = st.selectbox("Report Period", [
+            "This Month",
+            "Last Month", 
+            "Last 3 Months",
+            "Last 6 Months",
+            "This Year",
+            "All Time"
+        ])
+    
+    with col2:
+        report_type = st.selectbox("Report Type", [
+            "Revenue Summary",
+            "Time by Matter",
+            "Time by Attorney",
+            "Billable vs Non-Billable"
+        ])
+    
+    # Summary metrics
+    col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+    
+    time_entries = [dict_to_obj(e) if isinstance(e, dict) else e for e in st.session_state.time_entries]
+    
+    total_hours = sum(getattr(e, 'hours', 0) for e in time_entries)
+    total_revenue = sum(getattr(e, 'amount', 0) for e in time_entries)
+    billable_hours = sum(getattr(e, 'hours', 0) for e in time_entries if getattr(e, 'billable', False))
+    avg_rate = total_revenue / total_hours if total_hours > 0 else 0
+    
+    with col_met1:
+        st.metric("Total Hours", f"{total_hours:.1f}h")
+    
+    with col_met2:
+        st.metric("Total Revenue", f"${total_revenue:,.2f}")
+    
+    with col_met3:
+        st.metric("Billable Hours", f"{billable_hours:.1f}h")
+    
+    with col_met4:
+        st.metric("Avg Rate", f"${avg_rate:.2f}/h")
+    
+    st.markdown("---")
+    
+    # Show report based on selection
+    if report_type == "Revenue Summary":
+        st.markdown("#### 💰 Revenue Summary")
+        
+        # Group by month
+        revenue_by_month = {}
+        for entry in time_entries:
+            entry_date = getattr(entry, 'date', '')
+            if entry_date:
+                month = entry_date[:7]  # YYYY-MM
+                revenue_by_month[month] = revenue_by_month.get(month, 0) + getattr(entry, 'amount', 0)
+        
+        if revenue_by_month:
+            df = pd.DataFrame(list(revenue_by_month.items()), columns=['Month', 'Revenue'])
+            df = df.sort_values('Month')
+            
+            fig = px.bar(df, x='Month', y='Revenue', title='Revenue by Month')
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white')
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    elif report_type == "Time by Matter":
+        st.markdown("#### ⚖️ Time by Matter")
+        
+        # Group by matter
+        time_by_matter = {}
+        for entry in time_entries:
+            matter = getattr(entry, 'matter', 'Unknown')
+            time_by_matter[matter] = time_by_matter.get(matter, 0) + getattr(entry, 'hours', 0)
+        
+        if time_by_matter:
+            df = pd.DataFrame(list(time_by_matter.items()), columns=['Matter', 'Hours'])
+            df = df.sort_values('Hours', ascending=False)
+            
+            fig = px.pie(df, values='Hours', names='Matter', title='Time Distribution by Matter')
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white')
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    elif report_type == "Time by Attorney":
+        st.markdown("#### 👨‍⚖️ Time by Attorney")
+        
+        # Group by user
+        time_by_user = {}
+        for entry in time_entries:
+            user = getattr(entry, 'user', 'Unknown')
+            time_by_user[user] = time_by_user.get(user, 0) + getattr(entry, 'hours', 0)
+        
+        if time_by_user:
+            df = pd.DataFrame(list(time_by_user.items()), columns=['Attorney', 'Hours'])
+            df = df.sort_values('Hours', ascending=False)
+            
+            fig = px.bar(df, x='Attorney', y='Hours', title='Time by Attorney')
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white')
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    elif report_type == "Billable vs Non-Billable":
+        st.markdown("#### 💼 Billable vs Non-Billable")
+        
+        billable = sum(getattr(e, 'hours', 0) for e in time_entries if getattr(e, 'billable', False))
+        non_billable = sum(getattr(e, 'hours', 0) for e in time_entries if not getattr(e, 'billable', False))
+        
+        df = pd.DataFrame({
+            'Type': ['Billable', 'Non-Billable'],
+            'Hours': [billable, non_billable]
+        })
+        
+        fig = px.pie(df, values='Hours', names='Type', title='Billable vs Non-Billable Hours')
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white')
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Billable Hours", f"{billable:.1f}h")
+        with col2:
+            st.metric("Non-Billable Hours", f"{non_billable:.1f}h")
 
 def show_billing_settings():
     """Billing settings and configuration"""
     
     st.markdown("### ⚙️ Billing Settings")
-    st.info("Configure billing rates, invoice templates, and payment methods")
-
-def load_sample_time_entries():
-    """Load sample time entries for demo"""
     
-    sample_entries = [
-        {
-            'id': 1,
-            'date': (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d'),
-            'matter': 'Johnson Custody Case',
-            'activity': 'Client Meeting',
-            'description': 'Initial consultation regarding custody arrangements',
-            'hours': 2.0,
-            'rate': 250.0,
-            'amount': 500.0,
-            'billable': True,
-            'billed': False,
-            'user': 'John Smith'
-        },
-        {
-            'id': 2,
-            'date': (datetime.now() - timedelta(days=4)).strftime('%Y-%m-%d'),
-            'matter': 'Smith Contract Dispute',
-            'activity': 'Document Review',
-            'description': 'Reviewed employment contracts and supporting documentation',
-            'hours': 3.5,
-            'rate': 250.0,
-            'amount': 875.0,
-            'billable': True,
-            'billed': False,
-            'user': 'John Smith'
-        },
-        {
-            'id': 3,
-            'date': (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d'),
-            'matter': 'TechCorp Merger',
-            'activity': 'Research',
-            'description': 'Legal research on merger compliance requirements',
-            'hours': 4.0,
-            'rate': 300.0,
-            'amount': 1200.0,
-            'billable': True,
-            'billed': True,
-            'user': 'Sarah Johnson'
-        },
-        {
-            'id': 4,
-            'date': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d'),
-            'matter': 'Johnson Custody Case',
-            'activity': 'Phone Call',
-            'description': 'Phone conference with opposing counsel',
-            'hours': 0.5,
-            'rate': 150.0,
-            'amount': 75.0,
-            'billable': True,
-            'billed': False,
-            'user': 'John Smith'
-        },
-        {
-            'id': 5,
-            'date': (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'),
-            'matter': 'Smith Contract Dispute',
-            'activity': 'Drafting',
-            'description': 'Drafted response to opposing counsel demands',
-            'hours': 2.5,
-            'rate': 250.0,
-            'amount': 625.0,
-            'billable': True,
-            'billed': False,
-            'user': 'John Smith'
-        },
-        {
-            'id': 6,
-            'date': datetime.now().strftime('%Y-%m-%d'),
-            'matter': 'TechCorp Merger',
-            'activity': 'Email',
-            'description': 'Email correspondence with client regarding due diligence',
-            'hours': 0.25,
-            'rate': 150.0,
-            'amount': 37.5,
-            'billable': True,
-            'billed': False,
-            'user': 'Sarah Johnson'
-        },
-        {
-            'id': 7,
-            'date': (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'),
-            'matter': 'Anderson Real Estate',
-            'activity': 'Court Appearance',
-            'description': 'Hearing on motion for summary judgment',
-            'hours': 3.0,
-            'rate': 350.0,
-            'amount': 1050.0,
-            'billable': True,
-            'billed': True,
-            'user': 'Michael Davis'
-        },
-        {
-            'id': 8,
-            'date': (datetime.now() - timedelta(days=6)).strftime('%Y-%m-%d'),
-            'matter': 'Johnson Custody Case',
-            'activity': 'Document Review',
-            'description': 'Reviewed financial disclosures and custody evaluation',
-            'hours': 1.5,
-            'rate': 250.0,
-            'amount': 375.0,
-            'billable': True,
-            'billed': False,
-            'user': 'John Smith'
-        }
-    ]
+    tab1, tab2, tab3 = st.tabs(["💰 Rates", "📄 Invoice Templates", "💳 Payment"])
     
-    return sample_entries
-
-def load_sample_invoices():
-    """Load sample invoices for demo"""
+    with tab1:
+        st.markdown("#### Default Billing Rates")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            default_rate = st.number_input("Default Hourly Rate ($)", 
+                min_value=0.0, step=25.0, 
+                value=st.session_state.billing_settings.get('default_rate', 250.0))
+            
+            paralegal_rate = st.number_input("Paralegal Rate ($)", 
+                min_value=0.0, step=25.0, 
+                value=st.session_state.billing_settings.get('paralegal_rate', 150.0))
+            
+            associate_rate = st.number_input("Associate Rate ($)", 
+                min_value=0.0, step=25.0, 
+                value=st.session_state.billing_settings.get('associate_rate', 300.0))
+        
+        with col2:
+            partner_rate = st.number_input("Partner Rate ($)", 
+                min_value=0.0, step=25.0, 
+                value=st.session_state.billing_settings.get('partner_rate', 450.0))
+            
+            senior_partner_rate = st.number_input("Senior Partner Rate ($)", 
+                min_value=0.0, step=25.0, 
+                value=st.session_state.billing_settings.get('senior_partner_rate', 600.0))
+            
+            court_appearance_rate = st.number_input("Court Appearance Rate ($)", 
+                min_value=0.0, step=25.0, 
+                value=st.session_state.billing_settings.get('court_appearance_rate', 500.0))
+        
+        if st.button("💾 Save Rates", type="primary"):
+            st.session_state.billing_settings.update({
+                'default_rate': default_rate,
+                'paralegal_rate': paralegal_rate,
+                'associate_rate': associate_rate,
+                'partner_rate': partner_rate,
+                'senior_partner_rate': senior_partner_rate,
+                'court_appearance_rate': court_appearance_rate
+            })
+            auto_save_user_data()
+            st.success("✅ Billing rates saved successfully!")
+            st.rerun()
     
-    sample_invoices = [
-        {
-            'id': 1,
-            'invoice_number': 'INV-20251001-001',
-            'client': 'TechCorp Industries',
-            'date': '2025-10-01',
-            'due_date': '2025-10-31',
-            'subtotal': 2400.0,
-            'tax': 0.0,
-            'discount': 0.0,
-            'total': 2400.0,
-            'status': 'paid',
-            'payment_terms': 'Net 30',
-            'notes': 'Thank you for your business.',
-            'entries': []
-        },
-        {
-            'id': 2,
-            'invoice_number': 'INV-20251005-002',
-            'client': 'Anderson Real Estate LLC',
-            'date': '2025-10-05',
-            'due_date': '2025-11-04',
-            'subtotal': 1575.0,
-            'tax': 0.0,
-            'discount': 0.0,
-            'total': 1575.0,
-            'status': 'sent',
-            'payment_terms': 'Net 30',
-            'notes': 'Payment due within 30 days.',
-            'entries': []
-        },
-        {
-            'id': 3,
-            'invoice_number': 'INV-20251010-003',
-            'client': 'Smith & Associates',
-            'date': '2025-10-10',
-            'due_date': '2025-11-09',
-            'subtotal': 3250.0,
-            'tax': 0.0,
-            'discount': 100.0,
-            'total': 3150.0,
-            'status': 'sent',
-            'payment_terms': 'Net 30',
-            'notes': 'Volume discount applied.',
-            'entries': []
-        },
-        {
-            'id': 4,
-            'invoice_number': 'INV-20251012-004',
-            'client': 'Johnson Family Trust',
-            'date': '2025-10-12',
-            'due_date': '2025-11-11',
-            'subtotal': 950.0,
-            'tax': 0.0,
-            'discount': 0.0,
-            'total': 950.0,
-            'status': 'draft',
-            'payment_terms': 'Net 30',
-            'notes': '',
-            'entries': []
-        }
-    ]
+    with tab2:
+        st.markdown("#### Invoice Template Settings")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            firm_name = st.text_input("Firm Name", 
+                value=st.session_state.billing_settings.get('firm_name', ''))
+            
+            firm_address = st.text_area("Firm Address", 
+                value=st.session_state.billing_settings.get('firm_address', ''))
+            
+            firm_phone = st.text_input("Phone", 
+                value=st.session_state.billing_settings.get('firm_phone', ''))
+            
+            firm_email = st.text_input("Email", 
+                value=st.session_state.billing_settings.get('firm_email', ''))
+        
+        with col2:
+            invoice_prefix = st.text_input("Invoice Number Prefix", 
+                value=st.session_state.billing_settings.get('invoice_prefix', 'INV'))
+            
+            default_payment_terms = st.selectbox("Default Payment Terms", 
+                ["Net 30", "Net 15", "Due on Receipt", "Net 60"],
+                index=["Net 30", "Net 15", "Due on Receipt", "Net 60"].index(
+                    st.session_state.billing_settings.get('payment_terms', 'Net 30')))
+            
+            include_tax = st.checkbox("Include Tax on Invoices", 
+                value=st.session_state.billing_settings.get('include_tax', False))
+            
+            if include_tax:
+                tax_rate = st.number_input("Tax Rate (%)", 
+                    min_value=0.0, max_value=100.0, 
+                    value=st.session_state.billing_settings.get('tax_rate', 8.5))
+        
+        st.markdown("#### Invoice Footer")
+        invoice_footer = st.text_area("Footer Text", 
+            value=st.session_state.billing_settings.get('invoice_footer', 
+                'Thank you for your business.\nPayment is due within the terms specified above.'))
+        
+        if st.button("💾 Save Template Settings", type="primary"):
+            st.session_state.billing_settings.update({
+                'firm_name': firm_name,
+                'firm_address': firm_address,
+                'firm_phone': firm_phone,
+                'firm_email': firm_email,
+                'invoice_prefix': invoice_prefix,
+                'payment_terms': default_payment_terms,
+                'include_tax': include_tax,
+                'invoice_footer': invoice_footer
+            })
+            if include_tax:
+                st.session_state.billing_settings['tax_rate'] = tax_rate
+            auto_save_user_data()
+            st.success("✅ Invoice template settings saved!")
+            st.rerun()
     
-    return sample_invoices
+    with tab3:
+        st.markdown("#### Payment Methods")
+        
+        st.info("💡 Configure accepted payment methods for invoices")
+        
+        accept_check = st.checkbox("Accept Checks", 
+            value=st.session_state.billing_settings.get('accept_check', True))
+        accept_wire = st.checkbox("Accept Wire Transfer", 
+            value=st.session_state.billing_settings.get('accept_wire', True))
+        accept_credit = st.checkbox("Accept Credit Cards", 
+            value=st.session_state.billing_settings.get('accept_credit', True))
+        accept_ach = st.checkbox("Accept ACH/Direct Deposit", 
+            value=st.session_state.billing_settings.get('accept_ach', True))
+        
+        if accept_wire:
+            st.markdown("**Wire Transfer Information**")
+            bank_name = st.text_input("Bank Name", 
+                value=st.session_state.billing_settings.get('bank_name', ''))
+            routing_number = st.text_input("Routing Number", 
+                value=st.session_state.billing_settings.get('routing_number', ''))
+            account_number = st.text_input("Account Number", 
+                value=st.session_state.billing_settings.get('account_number', ''), 
+                type="password")
+        
+        st.markdown("#### Late Payment Settings")
+        charge_late_fees = st.checkbox("Charge Late Fees", 
+            value=st.session_state.billing_settings.get('charge_late_fees', False))
+        
+        if charge_late_fees:
+            late_fee_percent = st.number_input("Late Fee Percentage", 
+                min_value=0.0, max_value=25.0, 
+                value=st.session_state.billing_settings.get('late_fee_percent', 1.5))
+            grace_period = st.number_input("Grace Period (days)", 
+                min_value=0, 
+                value=st.session_state.billing_settings.get('grace_period', 5))
+        
+        if st.button("💾 Save Payment Settings", type="primary"):
+            st.session_state.billing_settings.update({
+                'accept_check': accept_check,
+                'accept_wire': accept_wire,
+                'accept_credit': accept_credit,
+                'accept_ach': accept_ach,
+                'charge_late_fees': charge_late_fees
+            })
+            if accept_wire:
+                st.session_state.billing_settings.update({
+                    'bank_name': bank_name,
+                    'routing_number': routing_number,
+                    'account_number': account_number
+                })
+            if charge_late_fees:
+                st.session_state.billing_settings.update({
+                    'late_fee_percent': late_fee_percent,
+                    'grace_period': grace_period
+                })
+            auto_save_user_data()
+            st.success("✅ Payment settings saved!")
+            st.rerun()
 
 if __name__ == "__main__":
     show()
