@@ -7,6 +7,12 @@ import uuid
 import os
 from services.subscription_manager import EnhancedAuthService
 def show():
+    # Initialize session state
+    if 'documents' not in st.session_state:
+        st.session_state.documents = []
+    if 'current_viewing_doc' not in st.session_state:
+        st.session_state.current_viewing_doc = None
+    
     # Professional header styling
     st.markdown("""
     <style>
@@ -258,9 +264,7 @@ def show():
     user_data = st.session_state.get('user_data', {})
     org_code = user_data.get('organization_code')
     
-    # Now call your function
-    show_dashboard_stats(auth_service, org_code)
-    
+        
     
     
     # Main tabs
@@ -351,9 +355,17 @@ def show_dashboard_stats(auth_service, org_code):
         )[:10]
         
         for idx, doc in enumerate(recent_docs):
-            doc_name = getattr(doc, 'name', 'Unknown Document')
-            doc_status = getattr(doc, 'status', 'unknown')
-            doc_size = getattr(doc, 'size', 'Unknown size')
+            # Handle both dict and object formats
+            if isinstance(doc, dict):
+                doc_id = doc.get('id', str(uuid.uuid4()))
+                doc_name = doc.get('name', 'Unknown Document')
+                doc_status = doc.get('status', 'unknown')
+                doc_size = doc.get('size', 'Unknown size')
+            else:
+                doc_id = getattr(doc, 'id', str(uuid.uuid4()))
+                doc_name = getattr(doc, 'name', 'Unknown Document')
+                doc_status = getattr(doc, 'status', 'unknown')
+                doc_size = getattr(doc, 'size', 'Unknown size')
             
             with st.expander(f"📄 {doc_name}"):
                 col1, col2, col3 = st.columns(3)
@@ -365,10 +377,60 @@ def show_dashboard_stats(auth_service, org_code):
                     st.write(f"**Size:** {doc_size}")
                 
                 with col3:
-                    if st.button("View", key=f"view_{doc_name}_{idx}"):
-                        st.info("Document viewer would open here")
+                    if st.button("View", key=f"view_dashboard_{doc_id}"):  # ✅ FIXED
+                        show_document_viewer(doc)
     else:
         st.info("No documents uploaded yet. Use the Upload tab to add your first document.")
+
+
+def show_document_viewer(doc):
+    """View document content"""
+    st.markdown("---")
+    st.markdown("### 📄 Document Viewer")
+    
+    # Handle both dict and object formats
+    if isinstance(doc, dict):
+        doc_name = doc.get('name', 'Unknown')
+        doc_content = doc.get('content')
+        doc_type = doc.get('type', 'Unknown')
+        doc_description = doc.get('description', 'No description')
+        doc_tags = doc.get('tags', [])
+    else:
+        doc_name = getattr(doc, 'name', 'Unknown')
+        doc_content = getattr(doc, 'content', None)
+        doc_type = getattr(doc, 'type', 'Unknown')
+        doc_description = getattr(doc, 'description', 'No description')
+        doc_tags = getattr(doc, 'tags', [])
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.write(f"**Document:** {doc_name}")
+        st.write(f"**Type:** {doc_type}")
+        st.write(f"**Description:** {doc_description}")
+        
+        if doc_tags:
+            st.write(f"**Tags:** {', '.join(doc_tags)}")
+        
+        # Show content if available
+        if doc_content:
+            if isinstance(doc_content, bytes):
+                # For binary files, offer download
+                st.download_button(
+                    label="📥 Download Document",
+                    data=doc_content,
+                    file_name=doc_name,
+                    mime='application/octet-stream'
+                )
+            else:
+                # For text content, display preview
+                st.text_area("Content Preview", doc_content[:1000], height=300)
+        else:
+            st.info("No content available for preview")
+    
+    with col2:
+        if st.button("❌ Close Viewer"):
+            st.rerun()
 
 def show_upload_interface(auth_service, org_code):
     """Document upload interface with subscription-based storage limits"""
@@ -529,30 +591,35 @@ def show_upload_interface(auth_service, org_code):
             show_storage_report(auth_service, org_code)
 
 def process_document_upload(uploaded_file, title, doc_type, matter_id, tags, is_privileged, description, auth_service, org_code):
-    """Process single document upload"""
+    """Process single document upload with real file content"""
     try:
-        # Create document object
+        # Read the actual file content
+        uploaded_file.seek(0)  # Reset file pointer
+        file_content = uploaded_file.read()
+        
+        # Create document object with real content
         new_document = {
             'id': str(uuid.uuid4()),
             'name': title,
             'original_filename': uploaded_file.name,
             'type': doc_type,
+            'mime_type': uploaded_file.type,
             'matter_id': matter_id if matter_id != "None" else None,
             'tags': [tag.strip() for tag in tags.split(',') if tag.strip()],
             'is_privileged': is_privileged,
             'description': description,
             'size': f"{uploaded_file.size / (1024 * 1024):.1f} MB",
+            'size_bytes': uploaded_file.size,
             'upload_date': datetime.now(),
             'uploaded_by': st.session_state.user_data.get('name', 'Unknown'),
             'status': 'active',
-            'organization_code': org_code
+            'organization_code': org_code,
+            'content': file_content,  # ✅ Store actual file content
+            'path': f'/documents/{org_code}/{uploaded_file.name}'
         }
         
         # Add to session state
         st.session_state.documents.append(new_document)
-        
-        # In a real app, you would save the file to storage here
-        # For demo purposes, we just track the metadata
         
         return True
         
@@ -739,12 +806,22 @@ def show_document_list(documents):
             col_action1, col_action2, col_action3, col_action4 = st.columns(4)
             
             with col_action1:
-                if st.button("👁️ View", key=f"view_{doc['id']}"):
-                    st.info("Document viewer would open here")
+                if st.button("👁️ View", key=f"view_list_{doc['id']}"):  # ✅ Use doc ID
+                    show_document_viewer(doc)
             
             with col_action2:
-                if st.button("📥 Download", key=f"download_{doc['id']}"):
-                    st.info("Download would start here")
+                # Download button with real content
+                if 'content' in doc and doc['content']:
+                    st.download_button(
+                        label="📥 Download",
+                        data=doc['content'],
+                        file_name=doc.get('name', 'document'),
+                        mime=doc.get('mime_type', 'application/octet-stream'),
+                        key=f"download_list_{doc['id']}"
+                    )
+                else:
+                    if st.button("📥 Download", key=f"download_list_{doc['id']}"):
+                        st.error("File content not available")
             
             with col_action3:
                 if st.button("✏️ Edit", key=f"edit_{doc['id']}"):
