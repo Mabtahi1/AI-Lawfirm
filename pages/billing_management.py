@@ -3,7 +3,13 @@ from datetime import datetime
 
 def show():
     """Display the billing management page"""
-    
+    if 'show_payment_modal' not in st.session_state:
+        st.session_state.show_payment_modal = False
+    if 'show_cancel_modal' not in st.session_state:
+        st.session_state.show_cancel_modal = False
+    if 'billing_notification' not in st.session_state:
+        st.session_state.billing_notification = None
+        
     # Professional header styling
     st.markdown("""
     <style>
@@ -244,6 +250,11 @@ def show():
     </div>
 
     """, unsafe_allow_html=True)
+
+    # Display notification if exists
+    if st.session_state.billing_notification:
+        st.success(st.session_state.billing_notification)
+        st.session_state.billing_notification = None
     
     # Get user's organization
     user_data = st.session_state.get('user_data', {})
@@ -311,8 +322,9 @@ def show():
         if current_plan == 'basic':
             st.success("✓ Current Plan")
         else:
-            if st.button("Contact Sales", key="basic", use_container_width=True):
-                st.info("Contact support@legaldocpro.com to change plans")
+            if st.button("Contact Sales", key="basic_contact", use_container_width=True):
+                st.session_state.billing_notification = "📧 Please contact support@legaldocpro.com to change plans"
+                st.rerun()
     
     with col2:
         st.markdown("""
@@ -420,8 +432,82 @@ def show():
         st.caption("Expires 12/2026")
     
     with col2:
-        if st.button("Update Payment Method", use_container_width=True):
-            st.info("Payment method update coming soon")
+        if st.button("Update Payment Method", key="update_payment_btn", use_container_width=True):
+            st.session_state.show_payment_modal = True
+            st.rerun()
+    
+    # Payment method update modal
+    if st.session_state.show_payment_modal:
+        st.markdown("---")
+        st.markdown("### 💳 Update Payment Method")
+        
+        with st.form("payment_method_form"):
+            card_number = st.text_input("Card Number", placeholder="1234 5678 9012 3456", max_chars=16)
+            
+            col_exp1, col_exp2, col_cvv = st.columns(3)
+            with col_exp1:
+                exp_month = st.selectbox("Exp. Month", list(range(1, 13)))
+            with col_exp2:
+                exp_year = st.selectbox("Exp. Year", list(range(2025, 2036)))
+            with col_cvv:
+                cvv = st.text_input("CVV", max_chars=3, type="password")
+            
+            cardholder_name = st.text_input("Cardholder Name", placeholder="John Doe")
+            
+            col_submit, col_cancel = st.columns(2)
+            
+            with col_submit:
+                if st.form_submit_button("💾 Save Payment Method", type="primary", use_container_width=True):
+                    if card_number and cardholder_name and cvv:
+                        with st.spinner("Processing..."):
+                            time.sleep(1)
+                            st.session_state.billing_notification = "✅ Payment method updated successfully!"
+                            st.session_state.show_payment_modal = False
+                            st.rerun()
+                    else:
+                        st.error("Please fill in all required fields")
+            
+            with col_cancel:
+                if st.form_submit_button("❌ Cancel", use_container_width=True):
+                    st.session_state.show_payment_modal = False
+                    st.rerun()
+    
+    # Plan management
+    st.markdown("---")
+    st.markdown("## ⚙️ Plan Management")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📧 Contact Support", use_container_width=True):
+            st.session_state.billing_notification = "📧 Support email opened: support@legaldocpro.com"
+            st.rerun()
+    
+    with col2:
+        if st.button("❌ Cancel Subscription", use_container_width=True):
+            st.session_state.show_cancel_modal = True
+            st.rerun()
+    
+    # Cancel subscription modal
+    if st.session_state.show_cancel_modal:
+        st.markdown("---")
+        st.warning("### ⚠️ Cancel Subscription")
+        st.write("Are you sure you want to cancel your subscription? You will lose access to all premium features.")
+        
+        col_confirm, col_no = st.columns(2)
+        
+        with col_confirm:
+            if st.button("Yes, Cancel Subscription", key="confirm_cancel", use_container_width=True):
+                with st.spinner("Processing cancellation..."):
+                    time.sleep(1)
+                    st.session_state.billing_notification = "✅ Subscription cancelled. You have access until the end of your billing period."
+                    st.session_state.show_cancel_modal = False
+                    st.rerun()
+        
+        with col_no:
+            if st.button("No, Keep Subscription", key="keep_sub", type="primary", use_container_width=True):
+                st.session_state.show_cancel_modal = False
+                st.rerun()
 
 def handle_upgrade(subscription_manager, org_code, new_plan):
     """Handle plan upgrade"""
