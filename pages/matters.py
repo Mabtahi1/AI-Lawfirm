@@ -145,21 +145,26 @@ def create_new_user():
 
 
 def initialize_matter_session_state():
-    """Initialize matter-related session state"""
+    """Initialize matter-related session state with SECURE data access"""
+    from services.data_security import DataSecurity
+    
+    # Require authentication
+    DataSecurity.require_auth("Matter Management")
+    
     if 'matters' not in st.session_state:
-        st.session_state.matters = []
+        st.session_state.matters = DataSecurity.get_user_matters()
     
     if 'tasks' not in st.session_state:
-        st.session_state.tasks = []
+        st.session_state.tasks = DataSecurity.get_user_tasks()
     
     if 'time_entries' not in st.session_state:
-        st.session_state.time_entries = []
+        st.session_state.time_entries = DataSecurity.get_user_time_entries()
     
     if 'matter_expenses' not in st.session_state:
-        st.session_state.matter_expenses = []
+        st.session_state.matter_expenses = DataSecurity.load_user_data('matter_expenses', [])
     
     if 'documents' not in st.session_state:
-        st.session_state.documents = []    
+        st.session_state.documents = DataSecurity.get_user_documents()    
     
     # Sample data for demo
     if not st.session_state.matters:
