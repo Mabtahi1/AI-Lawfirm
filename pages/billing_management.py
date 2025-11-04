@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import datetime
+from services.data_security import DataSecurity
 
 def show():
     """Display the billing management page"""
@@ -9,7 +10,14 @@ def show():
         st.session_state.show_cancel_modal = False
     if 'billing_notification' not in st.session_state:
         st.session_state.billing_notification = None
-        
+
+    # ADD THIS SECTION HERE:
+    # Require authentication
+    DataSecurity.require_auth("Billing Management")
+    
+    # Get user email for subscription lookup
+    user_email = DataSecurity.get_current_user_email()
+    
     # Professional header styling
     st.markdown("""
     <style>
@@ -256,9 +264,10 @@ def show():
         st.success(st.session_state.billing_notification)
         st.session_state.billing_notification = None
     
-    # Get user's organization
+    # Get user's organization - use email as fallback
     user_data = st.session_state.get('user_data', {})
-    org_code = user_data.get('organization_code')
+    user_email = user_data.get('email')
+    org_code = user_data.get('organization_code', user_email)
     
     if not org_code:
         st.error("⚠️ No organization code found. Please log in again.")
@@ -409,27 +418,59 @@ def show():
     st.markdown("---")
     st.markdown("## 📜 Billing History")
     
-    # Mock billing data
+    # Load REAL billing history from user data
+    billing_history = DataSecurity.load_user_data('billing_history', [])
+    
+    if not billing_history:
+        # Create initial history if none exists
+        plan_price = '$299' if current_plan == 'basic' else ('$599' if current_plan == 'professional' else '$999')
+        
+        billing_history = [
+            {
+                'date': datetime.now().strftime('%Y-%m-%d'),
+                'description': f'{current_plan.title()} Plan',
+                'amount': plan_price,
+                'status': 'Paid'
+            }
+        ]
+        
+        # Save initial history
+        DataSecurity.save_user_data('billing_history', billing_history)
+    
+    # Display history
     import pandas as pd
     
-    billing_data = pd.DataFrame({
-        'Date': ['2025-01-01', '2024-12-01', '2024-11-01'],
-        'Description': [f'{current_plan.title()} Plan', f'{current_plan.title()} Plan', f'{current_plan.title()} Plan'],
-        'Amount': ['$299.00' if current_plan == 'professional' else ('$599.00' if current_plan == 'enterprise' else '$999.00')] * 3,
-        'Status': ['Paid', 'Paid', 'Paid']
-    })
+    billing_df = pd.DataFrame(billing_history)
     
-    st.dataframe(billing_data, use_container_width=True, hide_index=True)
+    # Rename columns for display
+    if not billing_df.empty:
+        billing_df.columns = ['Date', 'Description', 'Amount', 'Status']
+        st.dataframe(billing_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("No billing history available yet")
     
     # Payment method
     st.markdown("---")
     st.markdown("## 💳 Payment Method")
     
+    # Load saved payment method
+    payment_method = DataSecurity.load_user_data('payment_method', {
+        'last_four': '4242',
+        'card_type': 'Visa',
+        'exp_month': 12,
+        'exp_year': 2026
+    })
+    
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.info("💳 Visa ending in 4242")
-        st.caption("Expires 12/2026")
+        last_four = payment_method.get('last_four', '****')
+        card_type = payment_method.get('card_type', 'Card')
+        exp_month = payment_method.get('exp_month', 12)
+        exp_year = payment_method.get('exp_year', 2026)
+        
+        st.info(f"💳 {card_type} ending in {last_four}")
+        st.caption(f"Expires {exp_month:02d}/{exp_year}")
     
     with col2:
         if st.button("Update Payment Method", key="update_payment_btn", use_container_width=True):
@@ -461,6 +502,20 @@ def show():
                     if card_number and cardholder_name and cvv:
                         with st.spinner("Processing..."):
                             time.sleep(1)
+                            
+                            # Save payment method (masked for security)
+                            payment_method = {
+                                'last_four': card_number[-4:] if len(card_number) >= 4 else '****',
+                                'card_type': 'Visa',  # Could detect from number
+                                'exp_month': exp_month,
+                                'exp_year': exp_year,
+                                'cardholder': cardholder_name,
+                                'updated': datetime.now().isoformat()
+                            }
+                            
+                            # Save securely
+                            DataSecurity.save_user_data('payment_method', payment_method)
+                            
                             st.session_state.billing_notification = "✅ Payment method updated successfully!"
                             st.session_state.show_payment_modal = False
                             st.rerun()
@@ -539,30 +594,60 @@ def handle_upgrade(subscription_manager, org_code, new_plan):
         import time
         time.sleep(2)
         
-        # Update subscription
-        if subscription_manager:
-            try:
-                # Update the subscription in session state
+        try:
+            # Create subscription data
+            subscription_data = {
+                'plan': new_plan,
+                'status': 'active',
+                'start_date': datetime.now().isoformat(),
+                'billing_cycle': 'monthly',
+                'price': plan_prices[new_plan]
+            }
+            
+            # Save subscription securely
+            save_subscription_data(org_code, subscription_data)
+            
+            # Update subscription manager if available
+            if subscription_manager:
                 if 'subscriptions' not in st.session_state:
                     st.session_state.subscriptions = {}
-                
-                st.session_state.subscriptions[org_code] = {
-                    'plan': new_plan,
-                    'status': 'active',
-                    'start_date': datetime.now().isoformat(),
-                    'billing_cycle': 'monthly'
-                }
-                
-                st.success(f"✅ Successfully upgraded to {new_plan.title()} plan!")
-                st.balloons()
-                
-                st.info("Your new features are now active. Redirecting...")
-                
-                time.sleep(2)
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Upgrade failed: {e}")
-        else:
-            st.error("❌ Subscription manager not available")
+                st.session_state.subscriptions[org_code] = subscription_data
+            
+            st.success(f"✅ Successfully upgraded to {new_plan.title()} plan!")
+            st.balloons()
+            
+            st.info("Your new features are now active. Redirecting...")
+            
+            time.sleep(2)
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Upgrade failed: {e}")
+            
+def save_billing_history(org_code, transaction):
+    """Save billing transaction to history"""
+    # Load existing history
+    history = DataSecurity.load_user_data('billing_history', [])
+    
+    # Add new transaction
+    history.insert(0, transaction)  # Most recent first
+    
+    # Keep last 12 months
+    history = history[:12]
+    
+    # Save back
+    DataSecurity.save_user_data('billing_history', history)
+    
+def save_subscription_data(org_code, subscription_data):
+    """Save subscription data securely"""
+    # Save to session state
+    if 'subscriptions' not in st.session_state:
+        st.session_state.subscriptions = {}
+    
+    st.session_state.subscriptions[org_code] = subscription_data
+    
+    # Also save to user's persistent data
+    DataSecurity.save_user_data('subscription', subscription_data)
+    
 if __name__ == "__main__":
     show()            
