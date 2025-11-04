@@ -3,38 +3,16 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 
-DATA_DIR = "user_data"
+# ADD THIS IMPORT
+from services.data_security import DataSecurity
 
-def ensure_data_dir():
-    """Ensure data directory exists"""
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
-
-def get_user_file(user_email, data_type):
-    """Get file path for user data"""
-    ensure_data_dir()
-    safe_email = user_email.replace('@', '_at_').replace('.', '_')
-    return os.path.join(DATA_DIR, f"{safe_email}_{data_type}.json")
-
-def save_user_data(user_email, data_type, data):
-    """Save user data to file"""
-    file_path = get_user_file(user_email, data_type)
-    with open(file_path, 'w') as f:
-        json.dump(data, f, default=str)
-
-def load_user_data(user_email, data_type, default=None):
-    """Load user data from file"""
-    file_path = get_user_file(user_email, data_type)
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    return default if default is not None else []
 
 def auto_save_client_data():
-    """Automatically save client portal data"""
-    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
+    """SECURE auto-save client portal data"""
+    from services.data_security import DataSecurity
+    
     if 'portal_clients' in st.session_state:
-        save_user_data(user_email, 'portal_clients', st.session_state.portal_clients)
+        DataSecurity.save_user_data('portal_clients', st.session_state.portal_clients)
 
 
 def show():
