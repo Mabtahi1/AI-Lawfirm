@@ -7,49 +7,30 @@ from types import SimpleNamespace
 import json
 import os
 
-# Data persistence functions
-DATA_DIR = "user_data"
+# ADD THIS:
+from services.data_security import DataSecurity
 
-def ensure_data_dir():
-    """Ensure data directory exists"""
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
+# DELETE these old functions:
+# - DATA_DIR = "user_data"
+# - ensure_data_dir()
+# - get_user_file()
+# - save_user_data()
+# - load_user_data()
 
-def get_user_file(user_email, data_type):
-    """Get file path for user data"""
-    ensure_data_dir()
-    safe_email = user_email.replace('@', '_at_').replace('.', '_')
-    return os.path.join(DATA_DIR, f"{safe_email}_{data_type}.json")
-
-def save_user_data(user_email, data_type, data):
-    """Save user data to file"""
-    file_path = get_user_file(user_email, data_type)
-    with open(file_path, 'w') as f:
-        json.dump(data, f, default=str)
-
-def load_user_data(user_email, data_type, default=None):
-    """Load user data from file"""
-    file_path = get_user_file(user_email, data_type)
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    return default if default is not None else []
-
+# REPLACE auto_save_user_data with:
 def auto_save_user_data():
-    """Automatically save all user data"""
-    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
-    
+    """SECURE auto-save billing data"""
     if 'time_entries' in st.session_state:
-        save_user_data(user_email, 'time_entries', st.session_state.time_entries)
+        DataSecurity.save_user_data('time_entries', st.session_state.time_entries)
     
     if 'invoices' in st.session_state:
-        save_user_data(user_email, 'invoices', st.session_state.invoices)
+        DataSecurity.save_user_data('invoices', st.session_state.invoices)
     
     if 'matters' in st.session_state:
-        save_user_data(user_email, 'matters', st.session_state.matters)
+        DataSecurity.save_user_data('matters', st.session_state.matters)
     
     if 'billing_settings' in st.session_state:
-        save_user_data(user_email, 'billing_settings', st.session_state.billing_settings)
+        DataSecurity.save_user_data('billing_settings', st.session_state.billing_settings)
 
 def dict_to_obj(d):
     """Convert dict to SimpleNamespace object"""
@@ -63,7 +44,6 @@ def get_attr(item, attr, default=None):
 
 def show():
     """Display the Time & Billing page"""
-    from services.data_security import DataSecurity
     
     # Require authentication
     DataSecurity.require_auth("Time & Billing")
