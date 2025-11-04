@@ -38,6 +38,11 @@ def auto_save_client_data():
 
 
 def show():
+    from services.data_security import DataSecurity
+    
+    # Require authentication
+    DataSecurity.require_auth("Calendar & Tasks")
+    
     # Professional header styling
     st.markdown("""
     <style>
@@ -284,7 +289,16 @@ def show():
     
     if 'portal_clients' not in st.session_state:
         st.session_state.portal_clients = load_user_data(user_email, 'portal_clients', [])
+
+     # SECURE DATA LOADING
+    if 'events' not in st.session_state:
+        st.session_state.events = DataSecurity.get_user_events()
     
+    if 'tasks' not in st.session_state:
+        st.session_state.tasks = DataSecurity.get_user_tasks()
+    
+    if 'court_deadlines' not in st.session_state:
+        st.session_state.court_deadlines = DataSecurity.load_user_data('court_deadlines', [])
     
     # Client Portal tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
