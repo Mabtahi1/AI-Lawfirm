@@ -23,7 +23,6 @@ def auto_save_calendar_data():
         DataSecurity.save_user_data('court_deadlines', st.session_state.court_deadlines)
 
 def show():
-     from services.data_security import DataSecurity
     
     # Require authentication
     DataSecurity.require_auth("Calendar & Tasks")
