@@ -4,12 +4,18 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import uuid
-import os
-from services.subscription_manager import EnhancedAuthService
+
+# ADD SECURITY IMPORT
+from services.data_security import DataSecurity
+
 def show():
-    # Initialize session state
+    # Require authentication FIRST
+    DataSecurity.require_auth("Document Management")
+    
+    # Initialize session state with SECURE data
     if 'documents' not in st.session_state:
-        st.session_state.documents = []
+        st.session_state.documents = DataSecurity.get_user_documents()
+    
     if 'current_viewing_doc' not in st.session_state:
         st.session_state.current_viewing_doc = None
     
@@ -108,8 +114,6 @@ def show():
     [data-testid="stExpander"] [data-testid="stExpanderDetails"] * {
         color: #1e293b !important;
     }
-    
-    /* ADD THESE NEW RULES: */
     
     /* Query Suggestions - white boxes with dark text */
     .element-container:has(.stButton) {
@@ -244,28 +248,12 @@ def show():
         background-color: rgba(59, 130, 246, 0.8);
         color: white;
     }
-    
-
     </style>
     <div class="ai-header">
         <h1>📄 Document Management</h1>
         <p>Organize, store, and manage all your legal documents</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Initialize documents in session state if not exists
-    if 'documents' not in st.session_state:
-        st.session_state.documents = []
-        
-    # NEW:
-    auth_service = EnhancedAuthService()
-    
-    # Get org_code from session state
-    user_data = st.session_state.get('user_data', {})
-    org_code = user_data.get('organization_code')
-    
-        
-    
     
     # Main tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -277,95 +265,63 @@ def show():
     ])
     
     with tab1:
-        show_dashboard_stats(auth_service, org_code)
+        show_dashboard_stats()
     
     with tab2:
-        show_upload_interface(auth_service, org_code)
+        show_upload_interface()
     
     with tab3:
         show_search_and_filter()
     
     with tab4:
-        show_document_analytics(auth_service, org_code)
+        show_document_analytics()
     
     with tab5:
         show_document_settings()
 
-def show_dashboard_stats(auth_service, org_code):
-    subscription = auth_service.subscription_manager.get_organization_subscription(org_code)
+def show_dashboard_stats():
+    """Show dashboard with REAL user data"""
     
-    # Add this check
-    if not subscription:
-        st.warning("No subscription found for this organization")
-        return
-    
-    # Now safe to access
-    limits = auth_service.subscription_manager.get_plan_limits(subscription.get("plan", "trial"))
-    
-    
-    # Storage usage display
-    storage_used = subscription.get("storage_used_gb", 0)
-    max_storage = limits.get("storage_gb", 0)
-    storage_percentage = (storage_used / max_storage * 100) if max_storage > 0 else 0
+    # Get REAL user documents
+    documents = DataSecurity.get_user_documents()
     
     # Dashboard metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        total_docs = len(st.session_state.documents)
+        total_docs = len(documents)
         st.metric("Total Documents", total_docs)
     
     with col2:
-        draft_count = len([d for d in st.session_state.documents 
-                          if getattr(d, 'status', d.get('status') if isinstance(d, dict) else None) == 'draft'])
+        draft_count = len([d for d in documents if d.get('status') == 'draft'])
         st.metric("Draft Documents", draft_count)
     
     with col3:
-        st.metric("Storage Used", f"{storage_used:.1f}GB / {max_storage}GB")
-        if storage_percentage > 90:
-            st.error("Storage almost full!")
-        elif storage_percentage > 75:
-            st.warning("Storage getting full")
+        # Calculate total storage
+        total_size_bytes = sum(d.get('size_bytes', 0) for d in documents)
+        total_size_gb = total_size_bytes / (1024 * 1024 * 1024)
+        st.metric("Storage Used", f"{total_size_gb:.2f} GB")
     
     with col4:
-        privileged_count = len([d for d in st.session_state.documents 
-                               if getattr(d, 'is_privileged', False)])
+        privileged_count = len([d for d in documents if d.get('is_privileged', False)])
         st.metric("Privileged Documents", privileged_count)
-    
-    # Storage usage progress bar
-    st.subheader("Storage Usage")
-    progress_color = "red" if storage_percentage > 90 else "orange" if storage_percentage > 75 else "green"
-    st.progress(min(storage_percentage / 100, 1.0), text=f"{storage_percentage:.1f}% of {max_storage}GB used")
-    
-    if storage_percentage > 80:
-        st.warning("Consider upgrading your storage plan or removing old documents.")
-        if st.button("Upgrade Storage Plan"):
-            st.session_state['show_upgrade_modal'] = True
-            st.rerun()
     
     # Recent documents
     st.subheader("Recent Documents")
     
-    if st.session_state.documents:
-        # Sort documents by date if available
+    if documents:
+        # Sort by upload date
         recent_docs = sorted(
-            st.session_state.documents, 
-            key=lambda x: getattr(x, 'upload_date', datetime.now()) if hasattr(x, 'upload_date') else datetime.now(),
+            documents,
+            key=lambda x: x.get('upload_date', ''),
             reverse=True
         )[:10]
         
-        for idx, doc in enumerate(recent_docs):
-            # Handle both dict and object formats
-            if isinstance(doc, dict):
-                doc_id = doc.get('id', str(uuid.uuid4()))
-                doc_name = doc.get('name', 'Unknown Document')
-                doc_status = doc.get('status', 'unknown')
-                doc_size = doc.get('size', 'Unknown size')
-            else:
-                doc_id = getattr(doc, 'id', str(uuid.uuid4()))
-                doc_name = getattr(doc, 'name', 'Unknown Document')
-                doc_status = getattr(doc, 'status', 'unknown')
-                doc_size = getattr(doc, 'size', 'Unknown size')
+        for doc in recent_docs:
+            doc_id = doc.get('id', str(uuid.uuid4()))
+            doc_name = doc.get('name', 'Unknown Document')
+            doc_status = doc.get('status', 'unknown')
+            doc_size = doc.get('size', 'Unknown size')
             
             with st.expander(f"📄 {doc_name}"):
                 col1, col2, col3 = st.columns(3)
@@ -377,30 +333,21 @@ def show_dashboard_stats(auth_service, org_code):
                     st.write(f"**Size:** {doc_size}")
                 
                 with col3:
-                    if st.button("View", key=f"view_dashboard_{doc_id}"):  # ✅ FIXED
+                    if st.button("View", key=f"view_dashboard_{doc_id}"):
                         show_document_viewer(doc)
     else:
         st.info("No documents uploaded yet. Use the Upload tab to add your first document.")
-
 
 def show_document_viewer(doc):
     """View document content"""
     st.markdown("---")
     st.markdown("### 📄 Document Viewer")
     
-    # Handle both dict and object formats
-    if isinstance(doc, dict):
-        doc_name = doc.get('name', 'Unknown')
-        doc_content = doc.get('content')
-        doc_type = doc.get('type', 'Unknown')
-        doc_description = doc.get('description', 'No description')
-        doc_tags = doc.get('tags', [])
-    else:
-        doc_name = getattr(doc, 'name', 'Unknown')
-        doc_content = getattr(doc, 'content', None)
-        doc_type = getattr(doc, 'type', 'Unknown')
-        doc_description = getattr(doc, 'description', 'No description')
-        doc_tags = getattr(doc, 'tags', [])
+    doc_name = doc.get('name', 'Unknown')
+    doc_type = doc.get('type', 'Unknown')
+    doc_description = doc.get('description', 'No description')
+    doc_tags = doc.get('tags', [])
+    doc_id = doc.get('id')
     
     col1, col2 = st.columns([3, 1])
     
@@ -412,19 +359,19 @@ def show_document_viewer(doc):
         if doc_tags:
             st.write(f"**Tags:** {', '.join(doc_tags)}")
         
-        # Show content if available
-        if doc_content:
-            if isinstance(doc_content, bytes):
-                # For binary files, offer download
+        # Get actual file content
+        if doc_id and doc_name:
+            file_content = DataSecurity.get_document(doc_id, doc_name)
+            
+            if file_content:
                 st.download_button(
                     label="📥 Download Document",
-                    data=doc_content,
+                    data=file_content,
                     file_name=doc_name,
-                    mime='application/octet-stream'
+                    mime=doc.get('mime_type', 'application/octet-stream')
                 )
             else:
-                # For text content, display preview
-                st.text_area("Content Preview", doc_content[:1000], height=300)
+                st.info("File content not available")
         else:
             st.info("No content available for preview")
     
@@ -432,26 +379,10 @@ def show_document_viewer(doc):
         if st.button("❌ Close Viewer"):
             st.rerun()
 
-def show_upload_interface(auth_service, org_code):
-    """Document upload interface with subscription-based storage limits"""
+def show_upload_interface():
+    """SECURE document upload interface"""
     
-    st.subheader("📤  Documents")
-    
-    # Get current subscription limits
-    subscription = auth_service.subscription_manager.get_organization_subscription(org_code)
-    # Add this check
-    if not subscription:
-        st.warning("⚠️ No subscription found. Please contact your administrator.")
-        return
-        
-    limits = auth_service.subscription_manager.get_plan_limits(subscription.get("plan", "trial"))
-    
-    # Display storage info
-    storage_used = subscription.get("storage_used_gb", 0)
-    max_storage = limits.get("storage_gb", 0)
-    available_storage = max_storage - storage_used
-    
-    st.info(f"Available storage: {available_storage:.1f}GB / {max_storage}GB")
+    st.subheader("📤 Upload Documents")
     
     # File upload interface
     col1, col2 = st.columns([3, 1])
@@ -471,98 +402,46 @@ def show_upload_interface(auth_service, org_code):
             st.write(f"**Size:** {file_size_mb:.1f} MB")
             st.write(f"**Type:** {uploaded_file.type}")
             
-            # Check storage limits before upload
-            if not auth_service.check_storage_before_upload(file_size_mb):
-                st.error("❌ Storage limit exceeded! Cannot upload this file.")
-                st.warning(f"File size: {file_size_mb:.1f}MB | Available space: {available_storage*1024:.1f}MB")
+            # File metadata form
+            with st.form("file_upload_form"):
+                st.markdown("#### File Details")
                 
-                col_error1, col_error2 = st.columns(2)
-                with col_error1:
-                    if st.button("🗑️ Delete Old Files"):
-                        st.info("File management interface would open here")
+                col_form1, col_form2 = st.columns(2)
                 
-                with col_error2:
-                    if st.button("⬆️ Upgrade Storage"):
-                        st.session_state['show_upgrade_modal'] = True
+                with col_form1:
+                    document_title = st.text_input("Document Title", value=uploaded_file.name)
+                    document_type = st.selectbox("Document Type", [
+                        "Contract", "Legal Brief", "Correspondence", 
+                        "Court Filing", "Research", "Template", 
+                        "Invoice", "Other"
+                    ])
+                    
+                    # Get user's matters for dropdown
+                    matters = DataSecurity.get_user_matters()
+                    matter_options = ["None"] + [m.get('name', f"Matter {i}") for i, m in enumerate(matters)]
+                    matter_id = st.selectbox("Associated Matter", options=matter_options)
+                
+                with col_form2:
+                    tags = st.text_input("Tags (comma-separated)", placeholder="urgent, contract, client-a")
+                    is_privileged = st.checkbox("Attorney-Client Privileged")
+                    description = st.text_area("Description", height=100)
+                
+                # Upload button
+                if st.form_submit_button("📤 Upload Document", type="primary"):
+                    success = process_document_upload(
+                        uploaded_file, document_title, document_type, 
+                        matter_id, tags, is_privileged, description
+                    )
+                    
+                    if success:
+                        st.success(f"✅ Successfully uploaded: {document_title}")
                         st.rerun()
-            
-            else:
-                # File metadata form
-                with st.form("file_upload_form"):
-                    st.markdown("#### File Details")
-                    
-                    col_form1, col_form2 = st.columns(2)
-                    
-                    with col_form1:
-                        document_title = st.text_input("Document Title", value=uploaded_file.name)
-                        document_type = st.selectbox("Document Type", [
-                            "Contract", "Legal Brief", "Correspondence", 
-                            "Court Filing", "Research", "Template", 
-                            "Invoice", "Other"
-                        ])
-                        matter_id = st.selectbox("Associated Matter", 
-                                               options=["None"] + [f"Matter {i+1}" for i in range(5)])
-                    
-                    with col_form2:
-                        tags = st.text_input("Tags (comma-separated)", placeholder="urgent, contract, client-a")
-                        is_privileged = st.checkbox("Attorney-Client Privileged")
-                        description = st.text_area("Description", height=100)
-                    
-                    # Upload button
-                    if st.form_submit_button("📤 Upload Document", type="primary"):
-                        # Process the upload
-                        success = process_document_upload(
-                            uploaded_file, document_title, document_type, 
-                            matter_id, tags, is_privileged, description,
-                            auth_service, org_code
-                        )
-                        
-                        if success:
-                            st.success(f"✅ Successfully uploaded: {document_title}")
-                            st.info("Document has been processed and added to your document library.")
-                            
-                            # Update storage usage
-                            auth_service.subscription_manager.update_storage_usage(org_code, file_size_mb, "add")
-                            
-                            # Refresh the page to show updated stats
-                            st.rerun()
-        
-        # Batch upload (Professional+ only)
-        st.divider()
-        
-        if auth_service.subscription_manager.can_use_feature(org_code, "batch_processing"):
-            st.markdown("#### Batch Upload")
-            batch_files = st.file_uploader(
-                "Upload multiple files",
-                accept_multiple_files=True,
-                type=['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'],
-                help="Professional and Enterprise plans support batch upload"
-            )
-            
-            if batch_files:
-                total_size_mb = sum(file.size for file in batch_files) / (1024 * 1024)
-                st.write(f"**Files selected:** {len(batch_files)}")
-                st.write(f"**Total size:** {total_size_mb:.1f} MB")
-                
-                # Check if batch upload fits within storage limits
-                if auth_service.check_storage_before_upload(total_size_mb):
-                    if st.button("📤 Upload All Files", type="primary"):
-                        process_batch_upload(batch_files, auth_service, org_code)
-                else:
-                    st.error(f"❌ Batch upload exceeds storage limit ({total_size_mb:.1f}MB)")
-        else:
-            st.info("🔒 Batch upload requires Professional plan or higher.")
-            if st.button("Upgrade for Batch Upload"):
-                st.session_state['show_upgrade_modal'] = True
-                st.rerun()
     
     with col2:
-        # Upload guidelines and limits
+        # Upload guidelines
         st.markdown("#### Upload Guidelines")
         
-        st.markdown(f"**Plan:** {subscription['plan'].title()}")
-        st.markdown(f"**Max file size:** 100MB")
-        st.markdown(f"**Storage limit:** {max_storage}GB")
+        st.markdown("**Max file size:** 100MB")
         
         st.markdown("#### Supported Formats")
         formats = [
@@ -571,35 +450,40 @@ def show_upload_interface(auth_service, org_code):
             "📊 Excel spreadsheets",
             "🖼️ Images (JPG, PNG)",
             "📑 Text files",
-            "📋 PowerPoint presentations"
+            "📋 PowerPoint"
         ]
         
         for format_type in formats:
             st.write(format_type)
-        
-        # Quick actions
-        st.markdown("#### Quick Actions")
-        
-        if st.button("📁 View All Documents"):
-            st.session_state['current_page'] = 'Document Management'
-            st.rerun()
-        
-        if st.button("🔍 Search Documents"):
-            st.info("Search interface would open here")
-        
-        if st.button("📊 Storage Report"):
-            show_storage_report(auth_service, org_code)
 
-def process_document_upload(uploaded_file, title, doc_type, matter_id, tags, is_privileged, description, auth_service, org_code):
-    """Process single document upload with real file content"""
+def process_document_upload(uploaded_file, title, doc_type, matter_id, tags, is_privileged, description):
+    """Process document upload SECURELY"""
     try:
-        # Read the actual file content
-        uploaded_file.seek(0)  # Reset file pointer
+        # Read file content
+        uploaded_file.seek(0)
         file_content = uploaded_file.read()
         
-        # Create document object with real content
+        # Generate document ID
+        doc_id = str(uuid.uuid4())
+        
+        # Save actual file using DataSecurity
+        file_path = DataSecurity.save_document(
+            doc_id,
+            file_content,
+            uploaded_file.name,
+            uploaded_file.type
+        )
+        
+        if not file_path:
+            st.error("Failed to save file")
+            return False
+        
+        # Create document metadata
+        user_email = DataSecurity.get_current_user_email()
+        user_name = st.session_state.get('user_data', {}).get('name', 'Unknown')
+        
         new_document = {
-            'id': str(uuid.uuid4()),
+            'id': doc_id,
             'name': title,
             'original_filename': uploaded_file.name,
             'type': doc_type,
@@ -610,16 +494,21 @@ def process_document_upload(uploaded_file, title, doc_type, matter_id, tags, is_
             'description': description,
             'size': f"{uploaded_file.size / (1024 * 1024):.1f} MB",
             'size_bytes': uploaded_file.size,
-            'upload_date': datetime.now(),
-            'uploaded_by': st.session_state.user_data.get('name', 'Unknown'),
+            'upload_date': datetime.now().isoformat(),
+            'uploaded_by': user_name,
+            'uploaded_by_email': user_email,
             'status': 'active',
-            'organization_code': org_code,
-            'content': file_content,  # ✅ Store actual file content
-            'path': f'/documents/{org_code}/{uploaded_file.name}'
+            'path': file_path
         }
         
         # Add to session state
+        if 'documents' not in st.session_state:
+            st.session_state.documents = []
+        
         st.session_state.documents.append(new_document)
+        
+        # Save to persistent storage
+        DataSecurity.save_user_data('documents', st.session_state.documents)
         
         return True
         
@@ -627,42 +516,12 @@ def process_document_upload(uploaded_file, title, doc_type, matter_id, tags, is_
         st.error(f"Upload failed: {str(e)}")
         return False
 
-def process_batch_upload(batch_files, auth_service, org_code):
-    """Process multiple file uploads"""
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    successful_uploads = 0
-    total_files = len(batch_files)
-    
-    for i, file in enumerate(batch_files):
-        status_text.text(f"Uploading {file.name}...")
-        
-        # Process each file
-        success = process_document_upload(
-            file, file.name, "Other", "None", "", False, "",
-            auth_service, org_code
-        )
-        
-        if success:
-            successful_uploads += 1
-            # Update storage for each file
-            file_size_mb = file.size / (1024 * 1024)
-            auth_service.subscription_manager.update_storage_usage(org_code, file_size_mb, "add")
-        
-        # Update progress
-        progress_bar.progress((i + 1) / total_files)
-    
-    status_text.text(f"Batch upload complete: {successful_uploads}/{total_files} files uploaded successfully")
-    
-    if successful_uploads == total_files:
-        st.success(f"✅ All {total_files} files uploaded successfully!")
-    else:
-        st.warning(f"⚠️ {successful_uploads}/{total_files} files uploaded. Some uploads failed.")
-
 def show_search_and_filter():
-    """Document search and filtering interface"""
+    """Document search with REAL user data"""
     st.subheader("🔍 Search & Filter Documents")
+    
+    # Get REAL documents
+    documents = DataSecurity.get_user_documents()
     
     # Search interface
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -679,26 +538,9 @@ def show_search_and_filter():
         date_filter = st.selectbox("Date Range", 
                                  ["All Time", "Last 7 days", "Last 30 days", "Last 90 days", "This Year"])
     
-    # Advanced filters
-    with st.expander("🔧 Advanced Filters"):
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            matter_filter = st.selectbox("Matter", ["All Matters"] + [f"Matter {i+1}" for i in range(5)])
-            privileged_filter = st.selectbox("Privilege Status", ["All", "Privileged Only", "Non-Privileged Only"])
-        
-        with col2:
-            size_filter = st.selectbox("File Size", ["All Sizes", "< 1MB", "1-10MB", "10-100MB", "> 100MB"])
-            status_filter = st.selectbox("Status", ["All Status", "Active", "Draft", "Archived"])
-        
-        with col3:
-            uploaded_by_filter = st.selectbox("Uploaded By", ["All Users", "Me", "Others"])
-            tags_filter = st.text_input("Tags", placeholder="Enter tags to filter by")
-    
-    # Apply filters and show results
+    # Apply filters
     filtered_documents = apply_document_filters(
-        st.session_state.documents, search_query, doc_type_filter, 
-        date_filter, matter_filter, privileged_filter
+        documents, search_query, doc_type_filter, date_filter
     )
     
     # Results
@@ -709,30 +551,27 @@ def show_search_and_filter():
         col1, col2 = st.columns([1, 1])
         
         with col1:
-            view_mode = st.radio("View Mode", ["List", "Grid", "Table"], horizontal=True)
+            view_mode = st.radio("View Mode", ["List", "Table"], horizontal=True)
         
         with col2:
-            sort_by = st.selectbox("Sort By", ["Upload Date", "Name", "Size", "Type", "Last Modified"])
+            sort_by = st.selectbox("Sort By", ["Upload Date", "Name", "Size", "Type"])
         
         # Sort documents
         filtered_documents = sort_documents(filtered_documents, sort_by)
         
-        # Display documents
+        # Display
         if view_mode == "List":
             show_document_list(filtered_documents)
-        elif view_mode == "Grid":
-            show_document_grid(filtered_documents)
         else:
             show_document_table(filtered_documents)
-    
     else:
         st.info("No documents match your search criteria.")
 
-def apply_document_filters(documents, search_query, doc_type, date_filter, matter_filter, privileged_filter):
+def apply_document_filters(documents, search_query, doc_type, date_filter):
     """Apply filters to document list"""
     filtered = documents.copy()
     
-    # Search query filter
+    # Search query
     if search_query:
         search_lower = search_query.lower()
         filtered = [doc for doc in filtered 
@@ -740,7 +579,7 @@ def apply_document_filters(documents, search_query, doc_type, date_filter, matte
                       search_lower in doc.get('description', '').lower() or
                       any(search_lower in tag.lower() for tag in doc.get('tags', []))]
     
-    # Document type filter
+    # Document type
     if doc_type != "All Types":
         filtered = [doc for doc in filtered if doc.get('type') == doc_type]
     
@@ -748,12 +587,12 @@ def apply_document_filters(documents, search_query, doc_type, date_filter, matte
     if date_filter != "All Time":
         cutoff_date = get_date_cutoff(date_filter)
         filtered = [doc for doc in filtered 
-                   if doc.get('upload_date', datetime.now()) >= cutoff_date]
+                   if doc.get('upload_date', '') >= cutoff_date.isoformat()]
     
     return filtered
 
 def get_date_cutoff(date_filter):
-    """Get cutoff date based on filter selection"""
+    """Get cutoff date"""
     now = datetime.now()
     
     if date_filter == "Last 7 days":
@@ -768,13 +607,13 @@ def get_date_cutoff(date_filter):
     return datetime.min
 
 def sort_documents(documents, sort_by):
-    """Sort documents based on criteria"""
+    """Sort documents"""
     if sort_by == "Name":
         return sorted(documents, key=lambda x: x.get('name', '').lower())
     elif sort_by == "Upload Date":
-        return sorted(documents, key=lambda x: x.get('upload_date', datetime.min), reverse=True)
+        return sorted(documents, key=lambda x: x.get('upload_date', ''), reverse=True)
     elif sort_by == "Size":
-        return sorted(documents, key=lambda x: x.get('size', '0'), reverse=True)
+        return sorted(documents, key=lambda x: x.get('size_bytes', 0), reverse=True)
     elif sort_by == "Type":
         return sorted(documents, key=lambda x: x.get('type', ''))
     
@@ -783,13 +622,23 @@ def sort_documents(documents, sort_by):
 def show_document_list(documents):
     """Show documents in list view"""
     for doc in documents:
-        with st.expander(f"📄 {doc.get('name', 'Unknown')} - {doc.get('type', 'Unknown Type')}"):
+        doc_id = doc.get('id')
+        doc_name = doc.get('name', 'Unknown')
+        
+        with st.expander(f"📄 {doc_name} - {doc.get('type', 'Unknown Type')}"):
             col1, col2, col3 = st.columns(3)
             
             with col1:
                 st.write(f"**Type:** {doc.get('type', 'Unknown')}")
                 st.write(f"**Size:** {doc.get('size', 'Unknown')}")
-                st.write(f"**Uploaded:** {doc.get('upload_date', 'Unknown').strftime('%Y-%m-%d') if isinstance(doc.get('upload_date'), datetime) else 'Unknown'}")
+                
+                upload_date = doc.get('upload_date', '')
+                if upload_date:
+                    try:
+                        dt = datetime.fromisoformat(upload_date)
+                        st.write(f"**Uploaded:** {dt.strftime('%Y-%m-%d')}")
+                    except:
+                        st.write(f"**Uploaded:** {upload_date}")
             
             with col2:
                 st.write(f"**Status:** {doc.get('status', 'Unknown')}")
@@ -806,57 +655,51 @@ def show_document_list(documents):
             col_action1, col_action2, col_action3, col_action4 = st.columns(4)
             
             with col_action1:
-                if st.button("👁️ View", key=f"view_list_{doc['id']}"):  # ✅ Use doc ID
+                if st.button("👁️ View", key=f"view_list_{doc_id}"):
                     show_document_viewer(doc)
             
             with col_action2:
-                # Download button with real content
-                if 'content' in doc and doc['content']:
-                    st.download_button(
-                        label="📥 Download",
-                        data=doc['content'],
-                        file_name=doc.get('name', 'document'),
-                        mime=doc.get('mime_type', 'application/octet-stream'),
-                        key=f"download_list_{doc['id']}"
-                    )
-                else:
-                    if st.button("📥 Download", key=f"download_list_{doc['id']}"):
-                        st.error("File content not available")
+                # Download with actual file
+                if doc_id and doc_name:
+                    file_content = DataSecurity.get_document(doc_id, doc_name)
+                    
+                    if file_content:
+                        st.download_button(
+                            label="📥 Download",
+                            data=file_content,
+                            file_name=doc_name,
+                            mime=doc.get('mime_type', 'application/octet-stream'),
+                            key=f"download_list_{doc_id}"
+                        )
             
             with col_action3:
-                if st.button("✏️ Edit", key=f"edit_{doc['id']}"):
-                    st.info("Edit interface would open here")
+                if st.button("✏️ Edit", key=f"edit_{doc_id}"):
+                    st.info("Edit interface coming soon")
             
             with col_action4:
-                if st.button("🗑️ Delete", key=f"delete_{doc['id']}"):
-                    delete_document(doc, st.session_state.user_data.get('organization_code'))
-
-def show_document_grid(documents):
-    """Show documents in grid view"""
-    cols_per_row = 3
-    for i in range(0, len(documents), cols_per_row):
-        cols = st.columns(cols_per_row)
-        for j, doc in enumerate(documents[i:i+cols_per_row]):
-            with cols[j]:
-                with st.container():
-                    st.markdown(f"**📄 {doc.get('name', 'Unknown')[:20]}...**")
-                    st.write(f"Type: {doc.get('type', 'Unknown')}")
-                    st.write(f"Size: {doc.get('size', 'Unknown')}")
-                    
-                    if st.button("View", key=f"grid_view_{doc['id']}"):
-                        st.info("Document viewer would open here")
+                if st.button("🗑️ Delete", key=f"delete_{doc_id}"):
+                    delete_document(doc)
 
 def show_document_table(documents):
     """Show documents in table view"""
     if documents:
-        # Create DataFrame for table display
         table_data = []
         for doc in documents:
+            upload_date = doc.get('upload_date', '')
+            if upload_date:
+                try:
+                    dt = datetime.fromisoformat(upload_date)
+                    date_str = dt.strftime('%Y-%m-%d')
+                except:
+                    date_str = str(upload_date)[:10]
+            else:
+                date_str = 'Unknown'
+            
             table_data.append({
                 "Name": doc.get('name', 'Unknown'),
                 "Type": doc.get('type', 'Unknown'),
                 "Size": doc.get('size', 'Unknown'),
-                "Upload Date": doc.get('upload_date', datetime.now()).strftime('%Y-%m-%d') if isinstance(doc.get('upload_date'), datetime) else 'Unknown',
+                "Upload Date": date_str,
                 "Status": doc.get('status', 'Unknown'),
                 "Privileged": "Yes" if doc.get('is_privileged') else "No"
             })
@@ -864,51 +707,41 @@ def show_document_table(documents):
         df = pd.DataFrame(table_data)
         st.dataframe(df, use_container_width=True)
 
-def delete_document(doc, org_code):
-    """Delete a document and update storage usage"""
+def delete_document(doc):
+    """SECURELY delete a document"""
     try:
+        doc_id = doc.get('id')
+        doc_name = doc.get('name')
+        
+        # Delete actual file
+        if doc_id and doc_name:
+            DataSecurity.delete_document(doc_id, doc_name)
+        
         # Remove from session state
-        st.session_state.documents = [d for d in st.session_state.documents if d['id'] != doc['id']]
+        st.session_state.documents = [d for d in st.session_state.documents if d.get('id') != doc_id]
         
-        # Update storage usage
-        from services.subscription_manager import EnhancedAuthService
-        auth_service = EnhancedAuthService()
+        # Save updated list
+        DataSecurity.save_user_data('documents', st.session_state.documents)
         
-        # Parse size string and update storage
-        size_str = doc.get('size', '0 MB')
-        size_mb = float(size_str.split()[0]) if 'MB' in size_str else 0
-        auth_service.subscription_manager.update_storage_usage(org_code, size_mb, "remove")
-        
-        st.success(f"Document '{doc['name']}' deleted successfully!")
+        st.success(f"Document '{doc_name}' deleted successfully!")
         st.rerun()
         
     except Exception as e:
         st.error(f"Error deleting document: {str(e)}")
 
-def show_document_analytics(auth_service, org_code):
-    """Show document analytics dashboard"""
-    
-    # Check if advanced analytics are available
-    if not auth_service.subscription_manager.can_use_feature(org_code, "advanced_analytics"):
-        st.warning("📊 Advanced Document Analytics requires Professional plan or higher.")
-        if st.button("Upgrade to Professional"):
-            st.session_state['show_upgrade_modal'] = True
-            st.rerun()
-        
-        # Show basic analytics only
-        show_basic_document_analytics()
-        return
-    
+def show_document_analytics():
+    """Show document analytics with REAL data"""
     st.subheader("📊 Document Analytics")
     
-    # Analytics dashboard
-    if st.session_state.documents:
+    documents = DataSecurity.get_user_documents()
+    
+    if documents:
         # Document type distribution
         col1, col2 = st.columns(2)
         
         with col1:
             doc_types = {}
-            for doc in st.session_state.documents:
+            for doc in documents:
                 doc_type = doc.get('type', 'Unknown')
                 doc_types[doc_type] = doc_types.get(doc_type, 0) + 1
             
@@ -918,112 +751,27 @@ def show_document_analytics(auth_service, org_code):
                 st.plotly_chart(fig1, use_container_width=True)
         
         with col2:
-            # Upload trends (mock data)
-            dates = pd.date_range('2024-01-01', '2024-09-01', freq='M')
-            upload_counts = [5, 8, 12, 15, 20, 18, 22, 25, 30]
+            # Storage by type
+            storage_by_type = {}
+            for doc in documents:
+                doc_type = doc.get('type', 'Unknown')
+                size_bytes = doc.get('size_bytes', 0)
+                storage_by_type[doc_type] = storage_by_type.get(doc_type, 0) + size_bytes
             
-            fig2 = px.line(x=dates, y=upload_counts, title="Document Upload Trends")
-            fig2.update_layout(xaxis_title="Month", yaxis_title="Documents Uploaded")
-            st.plotly_chart(fig2, use_container_width=True)
-        
-        # Storage analytics
-        show_storage_analytics(auth_service, org_code)
+            # Convert to MB
+            storage_mb = {k: v / (1024 * 1024) for k, v in storage_by_type.items()}
+            
+            if storage_mb:
+                fig2 = px.bar(x=list(storage_mb.keys()), y=list(storage_mb.values()),
+                             title="Storage by Document Type (MB)")
+                st.plotly_chart(fig2, use_container_width=True)
     
     else:
         st.info("No documents available for analytics.")
-
-def show_basic_document_analytics():
-    """Show basic analytics for Starter plan users"""
-    st.subheader("📊 Basic Document Analytics")
-    
-    if st.session_state.documents:
-        # Basic stats
-        total_docs = len(st.session_state.documents)
-        doc_types = {}
-        
-        for doc in st.session_state.documents:
-            doc_type = doc.get('type', 'Unknown')
-            doc_types[doc_type] = doc_types.get(doc_type, 0) + 1
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric("Total Documents", total_docs)
-            st.metric("Document Types", len(doc_types))
-        
-        with col2:
-            most_common_type = max(doc_types.items(), key=lambda x: x[1]) if doc_types else ("None", 0)
-            st.metric("Most Common Type", most_common_type[0])
-            st.metric("Count", most_common_type[1])
-    
-    else:
-        st.info("No documents available for analytics.")
-
-def show_storage_analytics(auth_service, org_code):
-    """Show detailed storage analytics"""
-    subscription = auth_service.subscription_manager.get_organization_subscription(org_code)
-    limits = auth_service.subscription_manager.get_plan_limits(subscription.get("plan", "trial"))
-    
-    st.subheader("💾 Storage Analytics")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    storage_used = subscription.get("storage_used_gb", 0)
-    max_storage = limits.get("storage_gb", 0)
-    
-    with col1:
-        st.metric("Storage Used", f"{storage_used:.2f} GB")
-    
-    with col2:
-        st.metric("Storage Limit", f"{max_storage} GB")
-    
-    with col3:
-        remaining = max_storage - storage_used
-        st.metric("Remaining", f"{remaining:.2f} GB")
-    
-    # Storage usage over time (mock data)
-    dates = pd.date_range('2024-01-01', periods=30, freq='D')
-    usage_data = [min(i * 0.1 + storage_used, max_storage) for i in range(30)]
-    
-    fig = px.line(x=dates, y=usage_data, title="Storage Usage Over Time")
-    fig.update_layout(xaxis_title="Date", yaxis_title="Storage Used (GB)")
-    st.plotly_chart(fig, use_container_width=True)
-
-def show_storage_report(auth_service, org_code):
-    """Show detailed storage report"""
-    st.subheader("📊 Storage Usage Report")
-    
-    subscription = auth_service.subscription_manager.get_organization_subscription(org_code)
-    limits = auth_service.subscription_manager.get_plan_limits(subscription.get("plan", "trial"))
-    
-    # Current usage
-    storage_used = subscription.get("storage_used_gb", 0)
-    max_storage = limits.get("storage_gb", 0)
-    
-    st.write(f"**Current Plan:** {subscription['plan'].title()}")
-    st.write(f"**Storage Used:** {storage_used:.2f} GB / {max_storage} GB")
-    st.write(f"**Usage Percentage:** {(storage_used/max_storage*100):.1f}%")
-    
-    # Recommendations
-    if storage_used / max_storage > 0.9:
-        st.error("⚠️ Storage is 90% full! Consider:")
-        st.write("• Delete old or unnecessary documents")
-        st.write("• Archive completed matters")
-        st.write("• Upgrade to a higher storage plan")
-    elif storage_used / max_storage > 0.75:
-        st.warning("Storage is 75% full. Plan ahead for additional storage needs.")
 
 def show_document_settings():
-    """Document management settings and preferences"""
+    """Document settings"""
     st.subheader("⚙️ Document Settings")
-    
-    # Get current user and organization
-    user_data = st.session_state.get('user_data', {})
-    org_code = user_data.get('organization_code')
-    
-    from services.subscription_manager import EnhancedAuthService
-    auth_service = EnhancedAuthService()
-    subscription = auth_service.subscription_manager.get_organization_subscription(org_code)
     
     # Document preferences
     col1, col2 = st.columns(2)
@@ -1039,229 +787,25 @@ def show_document_settings():
         
         auto_extract_text = st.checkbox("Auto-extract text from uploaded documents", value=True)
         auto_tag_documents = st.checkbox("Enable automatic document tagging", value=True)
-        
-        # Notification preferences
-        st.markdown("#### Notifications")
-        notify_upload = st.checkbox("Notify on document upload", value=True)
-        notify_share = st.checkbox("Notify when documents are shared", value=True)
-        notify_expire = st.checkbox("Notify before document expiration", value=False)
     
     with col2:
         st.markdown("#### Security Settings")
         
         require_approval = st.checkbox("Require approval for document sharing", value=False)
         watermark_documents = st.checkbox("Add watermark to downloaded documents", value=False)
-        
-        # Retention settings
-        st.markdown("#### Document Retention")
-        auto_archive_days = st.number_input("Auto-archive documents after (days)", min_value=0, value=365)
-        auto_delete_days = st.number_input("Auto-delete archived documents after (days)", min_value=0, value=0)
-        
-        if auto_delete_days > 0:
-            st.warning("Auto-deletion is permanent and cannot be undone!")
-    
-    # Advanced settings for higher tier plans
-    if auth_service.subscription_manager.can_use_feature(org_code, "white_label"):
-        st.markdown("#### White Label Customization")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            company_logo = st.file_uploader("Upload Company Logo", type=['png', 'jpg', 'jpeg'])
-            company_name = st.text_input("Company Name", value=user_data.get('organization_name', ''))
-        
-        with col2:
-            primary_color = st.color_picker("Primary Color", "#2E86AB")
-            secondary_color = st.color_picker("Secondary Color", "#A23B72")
-        
-        if st.button("Apply Branding"):
-            st.success("Branding settings saved!")
-    else:
-        st.info("🎨 White label customization available with Professional plan or higher.")
-        if st.button("Upgrade for White Label"):
-            st.session_state['show_upgrade_modal'] = True
-            st.rerun()
-    
-    # Storage management
-    st.markdown("#### Storage Management")
-    
-    storage_used = subscription.get("storage_used_gb", 0)
-    limits = auth_service.subscription_manager.get_plan_limits(subscription.get("plan", "trial"))
-    max_storage = limits.get("storage_gb", 0)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Current Usage", f"{storage_used:.1f}GB")
-    
-    with col2:
-        st.metric("Plan Limit", f"{max_storage}GB")
-    
-    with col3:
-        remaining = max_storage - storage_used
-        st.metric("Available", f"{remaining:.1f}GB")
-    
-    # Storage cleanup tools
-    st.markdown("#### Cleanup Tools")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🧹 Clean Duplicate Files"):
-            st.info("Scanning for duplicate documents...")
-            # Mock duplicate detection
-            st.success("No duplicate files found!")
-    
-    with col2:
-        if st.button("📦 Archive Old Documents"):
-            old_docs_count = len([d for d in st.session_state.documents 
-                                if (datetime.now() - d.get('upload_date', datetime.now())).days > 365])
-            if old_docs_count > 0:
-                st.info(f"Found {old_docs_count} documents older than 1 year")
-                if st.button("Archive These Documents"):
-                    st.success(f"Archived {old_docs_count} old documents!")
-            else:
-                st.success("No old documents to archive")
-    
-    with col3:
-        if st.button("🗑️ Delete Unused Files"):
-            st.warning("This will permanently delete unused documents!")
-            if st.button("Confirm Delete", type="primary"):
-                st.success("Cleanup completed!")
-    
-    # Backup and export
-    st.markdown("#### Backup & Export")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("📥 Export All Documents"):
-            st.info("Preparing document export...")
-            st.success("Export will be sent to your email when ready!")
-    
-    with col2:
-        if st.button("☁️ Backup to Cloud"):
-            if auth_service.subscription_manager.can_use_feature(org_code, "custom_integrations"):
-                st.success("Backup initiated to cloud storage!")
-            else:
-                st.error("Cloud backup requires Professional plan or higher")
     
     # Save settings
-    if st.button("💾 Save All Settings", type="primary"):
-        # In a real app, these settings would be saved to database
-        st.success("All document settings saved successfully!")
-        
-        # Mock settings save
+    if st.button("💾 Save Settings", type="primary"):
         settings = {
             'default_doc_type': default_doc_type,
             'auto_extract_text': auto_extract_text,
             'auto_tag_documents': auto_tag_documents,
-            'notify_upload': notify_upload,
-            'notify_share': notify_share,
-            'notify_expire': notify_expire,
             'require_approval': require_approval,
-            'watermark_documents': watermark_documents,
-            'auto_archive_days': auto_archive_days,
-            'auto_delete_days': auto_delete_days
+            'watermark_documents': watermark_documents
         }
         
-        # Store in session state for persistence during session
-        st.session_state['document_settings'] = settings
-
-# Helper functions for document management
-
-def get_file_icon(file_type):
-    """Get appropriate icon for file type"""
-    icons = {
-        'pdf': '📄',
-        'docx': '📝', 
-        'txt': '📑',
-        'xlsx': '📊',
-        'pptx': '📋',
-        'jpg': '🖼️',
-        'jpeg': '🖼️',
-        'png': '🖼️',
-        'contract': '📋',
-        'legal brief': '⚖️',
-        'correspondence': '💌',
-        'court filing': '🏛️',
-        'research': '🔍',
-        'template': '📄',
-        'invoice': '💰',
-        'other': '📁'
-    }
-    
-    return icons.get(file_type.lower(), '📄')
-
-def validate_file_upload(uploaded_file, max_size_mb=100):
-    """Validate uploaded file"""
-    if not uploaded_file:
-        return False, "No file selected"
-    
-    file_size_mb = uploaded_file.size / (1024 * 1024)
-    
-    if file_size_mb > max_size_mb:
-        return False, f"File size ({file_size_mb:.1f}MB) exceeds limit ({max_size_mb}MB)"
-    
-    allowed_types = ['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg', 'xlsx', 'pptx']
-    file_extension = uploaded_file.name.split('.')[-1].lower()
-    
-    if file_extension not in allowed_types:
-        return False, f"File type '{file_extension}' not supported"
-    
-    return True, "File validation passed"
-
-def generate_document_summary():
-    """Generate summary statistics for documents"""
-    docs = st.session_state.documents
-    
-    if not docs:
-        return {
-            'total_documents': 0,
-            'total_size_mb': 0,
-            'document_types': {},
-            'privileged_count': 0,
-            'recent_uploads': 0
-        }
-    
-    # Calculate statistics
-    total_docs = len(docs)
-    doc_types = {}
-    privileged_count = 0
-    recent_uploads = 0
-    total_size_mb = 0
-    
-    week_ago = datetime.now() - timedelta(days=7)
-    
-    for doc in docs:
-        # Document type distribution
-        doc_type = doc.get('type', 'Unknown')
-        doc_types[doc_type] = doc_types.get(doc_type, 0) + 1
-        
-        # Privileged documents
-        if doc.get('is_privileged', False):
-            privileged_count += 1
-        
-        # Recent uploads
-        upload_date = doc.get('upload_date')
-        if upload_date and upload_date >= week_ago:
-            recent_uploads += 1
-        
-        # Total size calculation
-        size_str = doc.get('size', '0 MB')
-        try:
-            size_mb = float(size_str.split()[0])
-            total_size_mb += size_mb
-        except:
-            pass
-    
-    return {
-        'total_documents': total_docs,
-        'total_size_mb': total_size_mb,
-        'document_types': doc_types,
-        'privileged_count': privileged_count,
-        'recent_uploads': recent_uploads
-    }
+        DataSecurity.save_user_data('document_settings', settings)
+        st.success("Settings saved successfully!")
 
 # Main execution
 if __name__ == "__main__":
