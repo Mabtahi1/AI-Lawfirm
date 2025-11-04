@@ -63,6 +63,10 @@ def get_attr(item, attr, default=None):
 
 def show():
     """Display the Time & Billing page"""
+    from services.data_security import DataSecurity
+    
+    # Require authentication
+    DataSecurity.require_auth("Time & Billing")
     
     # Professional header styling
     st.markdown("""
@@ -305,17 +309,16 @@ def show():
     
     # LOAD REAL USER DATA (NO MOCK DATA)
     if 'time_entries' not in st.session_state:
-        st.session_state.time_entries = load_user_data(user_email, 'time_entries', [])
+        st.session_state.time_entries = DataSecurity.get_user_time_entries()
     
     if 'invoices' not in st.session_state:
-        st.session_state.invoices = load_user_data(user_email, 'invoices', [])
+        st.session_state.invoices = DataSecurity.get_user_invoices()
     
     if 'matters' not in st.session_state:
-        # Load matters from matters.py if available, otherwise empty list
-        st.session_state.matters = load_user_data(user_email, 'matters', [])
+        st.session_state.matters = DataSecurity.get_user_matters()
     
     if 'billing_settings' not in st.session_state:
-        st.session_state.billing_settings = load_user_data(user_email, 'billing_settings', {
+        st.session_state.billing_settings = DataSecurity.load_user_data('billing_settings', {
             'default_rate': 250.0,
             'paralegal_rate': 150.0,
             'associate_rate': 300.0,
