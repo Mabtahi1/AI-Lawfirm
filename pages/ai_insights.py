@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import base64
 import io
 import uuid
+from services.data_security import DataSecurity
 
 # Document processing imports
 try:
@@ -266,6 +267,8 @@ def show():
     </div>
     """, unsafe_allow_html=True)
     
+    DataSecurity.require_auth("AI Legal Insights")
+
     # Main tabs
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📄 Document Intelligence", 
