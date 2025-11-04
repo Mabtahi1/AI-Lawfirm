@@ -16,7 +16,6 @@ def auto_save_client_data():
 
 
 def show():
-    from services.data_security import DataSecurity
     
     # Require authentication
     DataSecurity.require_auth("Client Portal")
