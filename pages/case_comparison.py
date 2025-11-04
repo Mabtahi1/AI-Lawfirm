@@ -13,15 +13,6 @@ def show():
     user_data = st.session_state.get('user_data', {})
     org_code = user_data.get('organization_code', user_email)
     
-    # If no user data at all, create a default one
-    if not user_data:
-        st.session_state.user_data = {
-            'email': 'demo@example.com',
-            'name': 'Demo User',
-            'organization_code': 'demo_org'
-        }
-        user_data = st.session_state.user_data
-        org_code = 'demo_org'
     
     # Import subscription manager - make it optional
     try:
@@ -331,7 +322,7 @@ def show():
     
     with tab1:
         show_new_case_comparison(subscription_manager, org_code, plan_name, has_subscription)
-    
+        
     with tab2:
         show_bulk_comparison()
     
@@ -432,7 +423,7 @@ def show_upgrade_prompt(current_plan, status):
             st.session_state['current_page'] = 'Billing Management'
             st.rerun()
 
-def show_new_case_comparison(subscription_manager, org_code, plan_name):
+def show_new_case_comparison(subscription_manager, org_code, plan_name, has_subscription):
     """Show new case comparison interface with usage tracking"""
     
     st.subheader("Compare New Case with Historical Cases")
@@ -472,8 +463,8 @@ def show_new_case_comparison(subscription_manager, org_code, plan_name):
     with col2:
         st.markdown("### 📚 Select Previous Cases to Compare")
         
-        # Get previous cases from session state
-        all_matters = st.session_state.get('matters', [])
+        # Get previous cases SECURELY from user's data
+        all_matters = DataSecurity.get_user_matters()
         
         if not all_matters:
             st.warning("No previous cases found. Please add some matters first.")
