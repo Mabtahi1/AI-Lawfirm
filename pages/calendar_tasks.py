@@ -47,6 +47,11 @@ def auto_save_calendar_data():
         save_user_data(user_email, 'court_deadlines', st.session_state.court_deadlines)
 
 def show():
+     from services.data_security import DataSecurity
+    
+    # Require authentication
+    DataSecurity.require_auth("Calendar & Tasks")
+        
     # Professional header styling
     st.markdown("""
     <style>
@@ -344,14 +349,15 @@ def show():
     # Initialize real user data
     user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
     
+    # SECURE DATA LOADING
     if 'events' not in st.session_state:
-        st.session_state.events = load_user_data(user_email, 'events', [])
+        st.session_state.events = DataSecurity.get_user_events()
     
     if 'tasks' not in st.session_state:
-        st.session_state.tasks = load_user_data(user_email, 'tasks', [])
+        st.session_state.tasks = DataSecurity.get_user_tasks()
     
     if 'court_deadlines' not in st.session_state:
-        st.session_state.court_deadlines = load_user_data(user_email, 'court_deadlines', [])
+        st.session_state.court_deadlines = DataSecurity.load_user_data('court_deadlines', [])
     
     # Calendar tabs
     tab1, tab2, tab3, tab4 = st.tabs([
