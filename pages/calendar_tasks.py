@@ -5,46 +5,22 @@ import calendar
 import json
 import os
 
-# Data persistence functions
-DATA_DIR = "user_data"
+# ADD THIS IMPORT
+from services.data_security import DataSecurity
 
-def ensure_data_dir():
-    """Ensure data directory exists"""
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
-
-def get_user_file(user_email, data_type):
-    """Get file path for user data"""
-    ensure_data_dir()
-    safe_email = user_email.replace('@', '_at_').replace('.', '_')
-    return os.path.join(DATA_DIR, f"{safe_email}_{data_type}.json")
-
-def save_user_data(user_email, data_type, data):
-    """Save user data to file"""
-    file_path = get_user_file(user_email, data_type)
-    with open(file_path, 'w') as f:
-        json.dump(data, f, default=str)
-
-def load_user_data(user_email, data_type, default=None):
-    """Load user data from file"""
-    file_path = get_user_file(user_email, data_type)
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    return default if default is not None else []
-
+# KEEP ONLY THIS:
 def auto_save_calendar_data():
-    """Automatically save calendar data"""
-    user_email = st.session_state.get('user_data', {}).get('email', 'demo@example.com')
+    """SECURE auto-save calendar data"""
+    from services.data_security import DataSecurity
     
     if 'events' in st.session_state:
-        save_user_data(user_email, 'events', st.session_state.events)
+        DataSecurity.save_user_data('events', st.session_state.events)
     
     if 'tasks' in st.session_state:
-        save_user_data(user_email, 'tasks', st.session_state.tasks)
+        DataSecurity.save_user_data('tasks', st.session_state.tasks)
     
     if 'court_deadlines' in st.session_state:
-        save_user_data(user_email, 'court_deadlines', st.session_state.court_deadlines)
+        DataSecurity.save_user_data('court_deadlines', st.session_state.court_deadlines)
 
 def show():
      from services.data_security import DataSecurity
