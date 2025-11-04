@@ -1,15 +1,16 @@
 import streamlit as st
 import pandas as pd
+from services.data_security import DataSecurity
 
 def show():
     """Display the case comparison page"""
     
-    def show():
-    """Display the case comparison page"""
+    # Require authentication
+    DataSecurity.require_auth("AI Case Comparison")
     
-    # Get user's organization - provide fallback
+    # Get user's organization securely
+    user_email = DataSecurity.get_current_user_email()
     user_data = st.session_state.get('user_data', {})
-    user_email = user_data.get('email', 'demo@example.com')
     org_code = user_data.get('organization_code', user_email)
     
     # If no user data at all, create a default one
@@ -31,7 +32,7 @@ def show():
         # If subscription service unavailable, continue without it
         subscription_manager = None
         has_subscription = False
-        st.warning("⚠️ Running in demo mode - subscription features disabled")
+        # Remove the warning - only show if actually needed
     
     # Professional header styling
     st.markdown("""
@@ -674,5 +675,36 @@ def show_similarity_matrix():
     st.image("https://via.placeholder.com/800x400/1e3a8a/ffffff?text=Similarity+Matrix+Visualization+Coming+Soon", 
              use_container_width=True)
 
+
+def save_comparison_result(case_data, selected_cases, similarity_score):
+    """Save case comparison result to user's history"""
+    comparison_record = {
+        'id': case_data['id'],
+        'timestamp': pd.Timestamp.now().isoformat(),
+        'case_title': case_data['title'],
+        'case_type': case_data['type'],
+        'compared_with': len(selected_cases),
+        'similarity_score': similarity_score,
+        'status': 'completed'
+    }
+    
+    # Load existing comparisons
+    comparisons = DataSecurity.load_user_data('case_comparisons', [])
+    
+    # Add new comparison
+    comparisons.insert(0, comparison_record)  # Most recent first
+    
+    # Keep last 50 comparisons
+    comparisons = comparisons[:50]
+    
+    # Save back
+    DataSecurity.save_user_data('case_comparisons', comparisons)
+    
+    return comparison_record
+
+def get_comparison_history():
+    """Get user's case comparison history"""
+    return DataSecurity.load_user_data('case_comparisons', [])
+    
 if __name__ == "__main__":
     show()
