@@ -1,13 +1,12 @@
 import streamlit as st
-import json
-import os
-import hashlib
 from datetime import datetime
+import hashlib
+
+# Always use local storage for now
+from services.local_storage import LocalStorage
 
 class DataSecurity:
     """Centralized data security and isolation manager"""
-    
-    DATA_DIR = "user_data"
     
     @staticmethod
     def get_current_user_email():
@@ -29,54 +28,50 @@ class DataSecurity:
         return hashlib.sha256(email.encode()).hexdigest()[:16]
     
     @staticmethod
-    def get_user_data_path(data_type):
-        """Get secure path for user's data file"""
-        email = DataSecurity.get_current_user_email()
-        safe_email = email.replace('@', '_at_').replace('.', '_').replace('/', '_')
-        
-        # Create user-specific directory
-        user_dir = os.path.join(DataSecurity.DATA_DIR, safe_email)
-        os.makedirs(user_dir, exist_ok=True)
-        
-        return os.path.join(user_dir, f"{data_type}.json")
-    
-    @staticmethod
     def save_user_data(data_type, data):
-        """Save data ONLY for current user"""
-        file_path = DataSecurity.get_user_data_path(data_type)
+        """
+        Save data for current user
         
-        # Add metadata
-        secure_data = {
-            'owner': DataSecurity.get_current_user_email(),
-            'last_modified': datetime.now().isoformat(),
-            'data': data
-        }
-        
-        with open(file_path, 'w') as f:
-            json.dump(secure_data, f, default=str, indent=2)
+        IMPORTANT: For documents, this saves METADATA only
+        Use save_document() for actual file content
+        """
+        email = DataSecurity.get_current_user_email()
+        return LocalStorage.save_user_data(email, data_type, data)
     
     @staticmethod
     def load_user_data(data_type, default=None):
-        """Load data ONLY for current user"""
-        file_path = DataSecurity.get_user_data_path(data_type)
+        """Load data for current user"""
+        email = DataSecurity.get_current_user_email()
+        return LocalStorage.load_user_data(email, data_type, default)
+    
+    @staticmethod
+    def save_document(document_id, file_content, filename, content_type):
+        """
+        Save actual document file
         
-        if not os.path.exists(file_path):
-            return default if default is not None else []
-        
-        try:
-            with open(file_path, 'r') as f:
-                secure_data = json.load(f)
-            
-            # Verify owner matches current user
-            if secure_data.get('owner') != DataSecurity.get_current_user_email():
-                st.error("🚨 Security violation: Data owner mismatch!")
-                return default if default is not None else []
-            
-            return secure_data.get('data', default if default is not None else [])
-        
-        except Exception as e:
-            st.error(f"Error loading data: {e}")
-            return default if default is not None else []
+        This saves the BINARY FILE, not base64 in JSON!
+        Returns: file path
+        """
+        email = DataSecurity.get_current_user_email()
+        return LocalStorage.save_document(email, document_id, file_content, filename, content_type)
+    
+    @staticmethod
+    def get_document(document_id, filename):
+        """Get actual document file content"""
+        email = DataSecurity.get_current_user_email()
+        return LocalStorage.get_document(email, document_id, filename)
+    
+    @staticmethod
+    def delete_document(document_id, filename):
+        """Delete document file"""
+        email = DataSecurity.get_current_user_email()
+        return LocalStorage.delete_document(email, document_id, filename)
+    
+    @staticmethod
+    def list_user_documents():
+        """List all documents for current user"""
+        email = DataSecurity.get_current_user_email()
+        return LocalStorage.list_user_documents(email)
     
     @staticmethod
     def verify_session():
@@ -92,12 +87,13 @@ class DataSecurity:
     
     @staticmethod
     def require_auth(page_name="this page"):
-        """Decorator/function to require authentication"""
+        """Require authentication"""
         if not DataSecurity.verify_session():
             st.error(f"🔒 Please log in to access {page_name}")
             st.info("👉 Go to Login page from the sidebar")
             st.stop()
     
+    # Convenience methods for common data types
     @staticmethod
     def get_user_matters():
         """Get ONLY current user's matters"""
