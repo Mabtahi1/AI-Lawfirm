@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import json
+from services.data_security import DataSecurity
 
 def show():
     # Initialize session state for search results and interactions
@@ -17,6 +18,18 @@ def show():
         st.session_state.ai_results = None
     if 'notification' not in st.session_state:
         st.session_state.notification = None
+
+    DataSecurity.require_auth("Advanced Search")
+    # Load user's search history and collections
+    if 'search_history' not in st.session_state:
+        st.session_state.search_history = DataSecurity.load_user_data('search_history', [])
+    
+    if 'search_collections' not in st.session_state:
+        st.session_state.search_collections = DataSecurity.load_user_data('search_collections', [])
+    
+    if 'saved_searches' not in st.session_state:
+        st.session_state.saved_searches = DataSecurity.load_user_data('saved_searches', [])
+        
     # Professional header styling
     st.markdown("""
     <style>
@@ -359,49 +372,68 @@ def show():
 
 
 def get_universal_search_results(query):
-    """Search across actual documents in session state"""
+    """Search across actual documents in session state - SECURE"""
     query_lower = query.lower()
     results = []
     
+    # Get user's matters securely
+    matters = DataSecurity.get_user_matters()
+    
     # Search through matters and their documents
-    if 'matters' in st.session_state:
-        for matter in st.session_state.matters:
-            # Search in matter documents
-            if 'documents' in matter:
-                for doc in matter['documents']:
-                    # Check if query matches document
-                    if (query_lower in doc.get('name', '').lower() or 
-                        query_lower in doc.get('description', '').lower() or
-                        query_lower in matter.get('name', '').lower()):
-                        
-                        results.append({
-                            "type": "Document",
-                            "title": doc.get('name', 'Untitled'),
-                            "content": doc.get('description', 'No description')[:200] + "...",
-                            "author": doc.get('uploaded_by', 'Unknown'),
-                            "date": doc.get('upload_date', 'N/A'),
-                            "matter": matter.get('name', 'Unknown'),
-                            "relevance": calculate_relevance(query_lower, doc, matter),
-                            "tags": doc.get('tags', []),
-                            "keywords": extract_keywords(doc)
-                        })
+    for matter in matters:
+        # Handle both dict and object formats
+        if isinstance(matter, dict):
+            matter_name = matter.get('name', 'Unknown')
+            matter_desc = matter.get('description', '')
+            matter_attorney = matter.get('lead_attorney', 'Unknown')
+            matter_date = matter.get('created_date', 'N/A')
+            matter_tags = matter.get('tags', [])
+        else:
+            matter_name = getattr(matter, 'name', 'Unknown')
+            matter_desc = getattr(matter, 'description', '')
+            matter_attorney = getattr(matter, 'lead_attorney', 'Unknown')
+            matter_date = getattr(matter, 'created_date', 'N/A')
+            matter_tags = getattr(matter, 'tags', [])
+        
+        # Search in matter details
+        if query_lower in matter_name.lower() or query_lower in matter_desc.lower():
+            results.append({
+                "type": "Matter",
+                "title": matter_name,
+                "content": matter_desc[:200] + "...",
+                "author": matter_attorney,
+                "date": matter_date,
+                "matter": matter_name,
+                "relevance": calculate_relevance(query_lower, {}, matter),
+                "tags": matter_tags,
+                "keywords": []
+            })
+    
+    # Get user's documents securely
+    documents = DataSecurity.get_user_documents()
+    
+    for doc in documents:
+        # Check if query matches document
+        if (query_lower in doc.get('name', '').lower() or 
+            query_lower in doc.get('description', '').lower()):
             
-            # Search in matter details
-            if query_lower in matter.get('name', '').lower() or query_lower in matter.get('description', '').lower():
-                results.append({
-                    "type": "Matter",
-                    "title": matter.get('name', 'Untitled Matter'),
-                    "content": matter.get('description', 'No description')[:200] + "...",
-                    "author": matter.get('lead_attorney', 'Unknown'),
-                    "date": matter.get('created_date', 'N/A'),
-                    "matter": matter.get('name', 'Unknown'),
-                    "relevance": calculate_relevance(query_lower, {}, matter),
-                    "tags": matter.get('tags', []),
-                    "keywords": []
-                })
+            results.append({
+                "type": "Document",
+                "title": doc.get('name', 'Untitled'),
+                "content": doc.get('description', 'No description')[:200] + "...",
+                "author": doc.get('uploaded_by', 'Unknown'),
+                "date": doc.get('upload_date', 'N/A'),
+                "matter": doc.get('matter_name', 'Unknown'),
+                "relevance": calculate_relevance(query_lower, doc, {}),
+                "tags": doc.get('tags', []),
+                "keywords": extract_keywords(doc)
+            })
     
     # Sort by relevance
     results.sort(key=lambda x: x['relevance'], reverse=True)
+    
+    # Save search to history
+    save_search_to_history(query, len(results))
     
     return results if results else []
 
@@ -773,51 +805,53 @@ def show_document_search():
                     st.rerun()
 
 def get_document_search_results(query, doc_type):
-    """Search actual documents with type filtering"""
+    """Search actual documents with type filtering - SECURE"""
     results = []
     
-    if 'matters' not in st.session_state:
+    # Get user's documents securely
+    documents = DataSecurity.get_user_documents()
+    
+    if not documents:
         return results
     
-    for matter in st.session_state.matters:
-        if 'documents' not in matter:
-            continue
-            
-        for doc in matter['documents']:
-            # Filter by document type if specified
-            if doc_type != "All Types":
-                if doc.get('type', '') != doc_type:
-                    continue
-            
-            # Filter by query
-            if query:
-                query_lower = query.lower()
-                if not (query_lower in doc.get('name', '').lower() or 
-                       query_lower in doc.get('description', '').lower()):
-                    continue
-            
-            # Get file info
-            file_size = doc.get('size', 0)
-            size_str = f"{file_size / 1024:.1f} KB" if file_size < 1024*1024 else f"{file_size / (1024*1024):.1f} MB"
-            
-            results.append({
-                "filename": doc.get('name', 'Untitled'),
-                "path": doc.get('path', '/unknown/'),
-                "size": size_str,
-                "pages": doc.get('pages', 'N/A'),
-                "last_modified": doc.get('modified_date', doc.get('upload_date', 'N/A')),
-                "created": doc.get('upload_date', 'N/A'),
-                "author": doc.get('uploaded_by', 'Unknown'),
-                "matter": matter.get('name', 'Unknown'),
-                "matches": count_query_matches(query, doc),
-                "relevance": calculate_relevance(query.lower() if query else '', doc, matter),
-                "version": doc.get('version', '1.0'),
-                "status": doc.get('status', 'Active'),
-                "security": doc.get('security_level', 'Standard'),
-                "type": doc.get('type', 'Document'),
-                "keywords": extract_keywords(doc),
-                "file_data": doc  # Store reference to actual file
-            })
+    for doc in documents:
+        # Filter by document type if specified
+        if doc_type != "All Types":
+            if doc.get('document_type', '') != doc_type:
+                continue
+        
+        # Filter by query
+        if query:
+            query_lower = query.lower()
+            if not (query_lower in doc.get('name', '').lower() or 
+                   query_lower in doc.get('description', '').lower()):
+                continue
+        
+        # Get file info
+        file_size = doc.get('size', 0)
+        size_str = f"{file_size / 1024:.1f} KB" if file_size < 1024*1024 else f"{file_size / (1024*1024):.1f} MB"
+        
+        results.append({
+            "filename": doc.get('name', 'Untitled'),
+            "path": doc.get('path', '/unknown/'),
+            "size": size_str,
+            "pages": doc.get('pages', 'N/A'),
+            "last_modified": doc.get('modified_date', doc.get('upload_date', 'N/A')),
+            "created": doc.get('upload_date', 'N/A'),
+            "author": doc.get('uploaded_by', 'Unknown'),
+            "matter": doc.get('matter_name', 'Unknown'),
+            "matches": count_query_matches(query, doc),
+            "relevance": calculate_relevance(query.lower() if query else '', doc, {}),
+            "version": doc.get('version', '1.0'),
+            "status": doc.get('status', 'Active'),
+            "security": doc.get('security_level', 'Standard'),
+            "type": doc.get('document_type', 'Document'),
+            "keywords": extract_keywords(doc),
+            "file_data": doc  # Store reference to actual file
+        })
+    
+    # Save search to history
+    save_search_to_history(query, len(results))
     
     return results
 
@@ -1366,111 +1400,229 @@ def show_search_management():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Search collections
+        # Search collections - USE REAL DATA
         st.markdown("#### Search Collections")
         
-        collections = [
-            {
-                "name": "ABC Corp Merger Documents", 
-                "items": 47,
-                "created": "2024-09-15",
-                "shared": True,
-                "tags": ["merger", "contracts", "due diligence"]
-            },
-            {
-                "name": "Patent Defense Research",
-                "items": 23, 
-                "created": "2024-09-12",
-                "shared": False,
-                "tags": ["patent", "defense", "prior art"]
-            },
-            {
-                "name": "Employment Law Updates",
-                "items": 15,
-                "created": "2024-09-10", 
-                "shared": True,
-                "tags": ["employment", "compliance", "updates"]
-            }
-        ]
+        # Get user's collections
+        collections = st.session_state.get('search_collections', [])
         
-        for collection in collections:
-            with st.expander(f"📁 {collection['name']} ({collection['items']} items)"):
-                col_coll1, col_coll2 = st.columns(2)
-                
-                with col_coll1:
-                    st.write(f"**Items:** {collection['items']}")
-                    st.write(f"**Created:** {collection['created']}")
-                    st.write(f"**Shared:** {'Yes' if collection['shared'] else 'No'}")
-                
-                with col_coll2:
-                    tag_display = " ".join([f"`{tag}`" for tag in collection['tags']])
-                    st.markdown(f"**Tags:** {tag_display}")
-                
-                col_coll_btn1, col_coll_btn2, col_coll_btn3, col_coll_btn4 = st.columns(4)
-                with col_coll_btn1:
-                    st.button("👁️ View", key=f"view_coll_{collection['name'][:10]}")
-                with col_coll_btn2:
-                    st.button("✏️ Edit", key=f"edit_coll_{collection['name'][:10]}")
-                with col_coll_btn3:
-                    st.button("📤 Export", key=f"export_coll_{collection['name'][:10]}")
-                with col_coll_btn4:
-                    st.button("🗑️ Delete", key=f"delete_coll_{collection['name'][:10]}")
+        if not collections:
+            st.info("📁 No collections yet. Create your first collection to organize search results.")
         
-        # Saved searches
+        # Add create collection form
+        with st.expander("➕ Create New Collection"):
+            with st.form("create_collection"):
+                collection_name = st.text_input("Collection Name:", placeholder="e.g., ABC Corp Merger Documents")
+                collection_desc = st.text_area("Description:", placeholder="Brief description of this collection...")
+                collection_tags = st.text_input("Tags (comma-separated):", placeholder="merger, contracts, due diligence")
+                
+                if st.form_submit_button("➕ Create Collection"):
+                    if collection_name:
+                        tags = [tag.strip() for tag in collection_tags.split(',') if tag.strip()]
+                        save_search_collection(collection_name, 0, tags)
+                        st.success(f"✅ Collection '{collection_name}' created!")
+                        st.rerun()
+                    else:
+                        st.error("Please enter a collection name")
+        
+        # Display existing collections
+        if collections:
+            for collection in collections:
+                with st.expander(f"📁 {collection['name']} ({collection.get('items', 0)} items)"):
+                    col_coll1, col_coll2 = st.columns(2)
+                    
+                    with col_coll1:
+                        st.write(f"**Items:** {collection.get('items', 0)}")
+                        created_date = collection.get('created', '')
+                        if created_date:
+                            try:
+                                created_dt = datetime.fromisoformat(created_date)
+                                created_str = created_dt.strftime('%Y-%m-%d')
+                            except:
+                                created_str = created_date[:10] if len(created_date) >= 10 else created_date
+                        else:
+                            created_str = 'Unknown'
+                        st.write(f"**Created:** {created_str}")
+                        st.write(f"**Shared:** {'Yes' if collection.get('shared') else 'No'}")
+                    
+                    with col_coll2:
+                        tags = collection.get('tags', [])
+                        if tags:
+                            tag_display = " ".join([f"`{tag}`" for tag in tags])
+                            st.markdown(f"**Tags:** {tag_display}")
+                        else:
+                            st.write("**Tags:** None")
+                    
+                    # Collection actions
+                    col_coll_btn1, col_coll_btn2, col_coll_btn3, col_coll_btn4 = st.columns(4)
+                    
+                    with col_coll_btn1:
+                        if st.button("👁️ View", key=f"view_coll_{collection['id']}"):
+                            st.session_state.notification = f"Opening collection: {collection['name']}"
+                            st.rerun()
+                    
+                    with col_coll_btn2:
+                        if st.button("✏️ Edit", key=f"edit_coll_{collection['id']}"):
+                            st.session_state.editing_collection = collection
+                            st.session_state.notification = "Edit mode enabled"
+                            st.rerun()
+                    
+                    with col_coll_btn3:
+                        if st.button("📤 Export", key=f"export_coll_{collection['id']}"):
+                            # Generate export data
+                            export_data = {
+                                'collection_name': collection['name'],
+                                'items': collection.get('items', 0),
+                                'tags': collection.get('tags', []),
+                                'created': collection.get('created', ''),
+                                'exported': datetime.now().isoformat()
+                            }
+                            
+                            import json
+                            export_json = json.dumps(export_data, indent=2)
+                            
+                            st.download_button(
+                                label="📥 Download JSON",
+                                data=export_json,
+                                file_name=f"collection_{collection['name'].replace(' ', '_')}.json",
+                                mime="application/json",
+                                key=f"download_export_{collection['id']}"
+                            )
+                            st.session_state.notification = "Collection export ready"
+                    
+                    with col_coll_btn4:
+                        if st.button("🗑️ Delete", key=f"delete_coll_{collection['id']}"):
+                            st.session_state.search_collections = [
+                                c for c in st.session_state.search_collections 
+                                if c.get('id') != collection['id']
+                            ]
+                            DataSecurity.save_user_data('search_collections', st.session_state.search_collections)
+                            st.success(f"✓ Collection '{collection['name']}' deleted")
+                            st.rerun()
+        
+        # Saved searches - USE REAL DATA
+        st.markdown("---")
         st.markdown("#### Saved Search Queries")
         
-        saved_queries = [
-            {
-                "name": "Expiring Contracts Q4 2024",
-                "query": "contract expiration:2024-10-01 TO 2024-12-31",
-                "results": 12,
-                "last_run": "2024-09-20",
-                "alert": True
-            },
-            {
-                "name": "Patent Litigation Cases",
-                "query": "patent AND (litigation OR infringement)",
-                "results": 45,
-                "last_run": "2024-09-18", 
-                "alert": False
-            },
-            {
-                "name": "Confidential ABC Corp Documents",
-                "query": "client:'ABC Corp' AND security:confidential",
-                "results": 78,
-                "last_run": "2024-09-19",
-                "alert": False
-            }
-        ]
+        saved_queries = st.session_state.get('saved_searches', [])
         
-        for query in saved_queries:
-            alert_icon = "🔔" if query['alert'] else "🔕"
-            
-            with st.expander(f"🔍 {query['name']} ({query['results']} results) {alert_icon}"):
-                col_query1, col_query2 = st.columns(2)
+        if not saved_queries:
+            st.info("🔍 No saved searches yet. Save your searches for quick access later.")
+        
+        # Add save search form
+        with st.expander("➕ Save New Search"):
+            with st.form("save_search_query"):
+                query_name = st.text_input("Search Name:", placeholder="e.g., Expiring Contracts Q4 2024")
+                search_query = st.text_input("Search Query:", placeholder="Enter search terms or query...")
                 
-                with col_query1:
-                    st.code(query['query'])
-                    st.write(f"**Last Run:** {query['last_run']}")
+                col_save1, col_save2 = st.columns(2)
+                with col_save1:
+                    enable_alert = st.checkbox("Enable Alert", value=False)
+                with col_save2:
+                    alert_frequency = st.selectbox("Alert Frequency:", 
+                        ["Daily", "Weekly", "Monthly"], 
+                        disabled=not enable_alert)
                 
-                with col_query2:
-                    st.write(f"**Results:** {query['results']}")
-                    st.write(f"**Alert:** {'Enabled' if query['alert'] else 'Disabled'}")
+                if st.form_submit_button("💾 Save Search"):
+                    if query_name and search_query:
+                        save_search_query(query_name, search_query, enable_alert)
+                        st.success(f"✅ Search '{query_name}' saved!")
+                        st.rerun()
+                    else:
+                        st.error("Please enter both search name and query")
+        
+        # Display saved searches
+        if saved_queries:
+            for query in saved_queries:
+                alert_icon = "🔔" if query.get('alert') else "🔕"
+                results_count = query.get('results', 0)
                 
-                col_query_btn1, col_query_btn2, col_query_btn3, col_query_btn4 = st.columns(4)
-                with col_query_btn1:
-                    st.button("▶️ Run", key=f"run_query_{query['name'][:10]}")
-                with col_query_btn2:
-                    st.button("✏️ Edit", key=f"edit_query_{query['name'][:10]}")
-                with col_query_btn3:
-                    st.button(f"{'🔔' if not query['alert'] else '🔕'} Alert", key=f"alert_query_{query['name'][:10]}")
-                with col_query_btn4:
-                    st.button("🗑️ Delete", key=f"delete_query_{query['name'][:10]}")
+                with st.expander(f"🔍 {query['name']} ({results_count} results) {alert_icon}"):
+                    col_query1, col_query2 = st.columns(2)
+                    
+                    with col_query1:
+                        st.code(query['query'])
+                        
+                        last_run = query.get('last_run', '')
+                        if last_run:
+                            try:
+                                last_run_dt = datetime.fromisoformat(last_run)
+                                last_run_str = last_run_dt.strftime('%Y-%m-%d %H:%M')
+                            except:
+                                last_run_str = last_run[:16] if len(last_run) >= 16 else last_run
+                        else:
+                            last_run_str = 'Never'
+                        
+                        st.write(f"**Last Run:** {last_run_str}")
+                    
+                    with col_query2:
+                        st.write(f"**Results:** {results_count}")
+                        st.write(f"**Alert:** {'Enabled' if query.get('alert') else 'Disabled'}")
+                        
+                        created = query.get('created', '')
+                        if created:
+                            try:
+                                created_dt = datetime.fromisoformat(created)
+                                created_str = created_dt.strftime('%Y-%m-%d')
+                            except:
+                                created_str = created[:10] if len(created) >= 10 else created
+                            st.write(f"**Created:** {created_str}")
+                    
+                    # Query actions
+                    col_query_btn1, col_query_btn2, col_query_btn3, col_query_btn4 = st.columns(4)
+                    
+                    with col_query_btn1:
+                        if st.button("▶️ Run", key=f"run_query_{query['id']}"):
+                            # Execute the saved search
+                            st.session_state.search_query = query['query']
+                            st.session_state.search_results = get_universal_search_results(query['query'])
+                            
+                            # Update last run and results count
+                            for q in st.session_state.saved_searches:
+                                if q['id'] == query['id']:
+                                    q['last_run'] = datetime.now().isoformat()
+                                    q['results'] = len(st.session_state.search_results) if st.session_state.search_results else 0
+                            
+                            DataSecurity.save_user_data('saved_searches', st.session_state.saved_searches)
+                            st.session_state.notification = f"Running search: {query['name']}"
+                            st.rerun()
+                    
+                    with col_query_btn2:
+                        if st.button("✏️ Edit", key=f"edit_query_{query['id']}"):
+                            st.session_state.editing_query = query
+                            st.session_state.notification = f"Editing query: {query['name']}"
+                            st.rerun()
+                    
+                    with col_query_btn3:
+                        alert_label = "🔕 Disable" if query.get('alert') else "🔔 Enable"
+                        if st.button(alert_label, key=f"alert_query_{query['id']}"):
+                            # Toggle alert
+                            for q in st.session_state.saved_searches:
+                                if q['id'] == query['id']:
+                                    q['alert'] = not q.get('alert', False)
+                            
+                            DataSecurity.save_user_data('saved_searches', st.session_state.saved_searches)
+                            status = "enabled" if query.get('alert') else "disabled"
+                            st.success(f"✓ Alert {status} for '{query['name']}'")
+                            st.rerun()
+                    
+                    with col_query_btn4:
+                        if st.button("🗑️ Delete", key=f"delete_query_{query['id']}"):
+                            st.session_state.saved_searches = [
+                                q for q in st.session_state.saved_searches 
+                                if q['id'] != query['id']
+                            ]
+                            DataSecurity.save_user_data('saved_searches', st.session_state.saved_searches)
+                            st.success(f"✓ Query '{query['name']}' deleted")
+                            st.rerun()
         
         # Search alerts and notifications
+        st.markdown("---")
         st.markdown("#### Search Alerts & Notifications")
         
         with st.form("create_alert"):
+            st.markdown("**Create New Alert**")
+            
             alert_name = st.text_input("Alert Name:", placeholder="e.g., New ABC Corp Documents")
             alert_query = st.text_input("Search Query:", placeholder="Enter search terms or query...")
             
@@ -1481,16 +1633,28 @@ def show_search_management():
                 notification_method = st.multiselect("Notify Via:", ["Email", "In-App", "SMS", "Slack"])
             
             if st.form_submit_button("🔔 Create Alert"):
-                st.success(f"Alert '{alert_name}' created successfully!")
+                if alert_name and alert_query:
+                    # Save as a saved search with alert enabled
+                    save_search_query(alert_name, alert_query, alert_enabled=True)
+                    st.success(f"✅ Alert '{alert_name}' created successfully!")
+                    st.rerun()
+                else:
+                    st.error("Please fill in alert name and query")
     
     with col2:
         st.markdown("#### Search Statistics")
         
+        # Calculate REAL statistics from user's data
+        search_history_count = len(st.session_state.get('search_history', []))
+        collections_count = len(st.session_state.get('search_collections', []))
+        saved_searches_count = len(st.session_state.get('saved_searches', []))
+        active_alerts = sum(1 for q in st.session_state.get('saved_searches', []) if q.get('alert'))
+        
         search_stats = [
-            ("Total Searches", "1,247"),
-            ("Saved Collections", "12"),
-            ("Active Alerts", "5"),
-            ("Shared Searches", "8")
+            ("Total Searches", str(search_history_count)),
+            ("Saved Collections", str(collections_count)),
+            ("Active Alerts", str(active_alerts)),
+            ("Saved Queries", str(saved_searches_count))
         ]
         
         for stat, value in search_stats:
@@ -1499,26 +1663,82 @@ def show_search_management():
         st.markdown("#### Quick Actions")
         
         quick_actions = [
-            "📁 New Collection",
-            "🔍 Save Current Search", 
-            "🔔 Create Alert",
-            "📤 Export All",
-            "⚙️ Search Settings",
-            "📊 Usage Analytics"
+            ("📁 New Collection", "create_collection"),
+            ("🔍 Save Current Search", "save_search"),
+            ("🔔 Create Alert", "create_alert"),
+            ("📤 Export All", "export_all"),
+            ("⚙️ Search Settings", "settings"),
+            ("📊 Usage Analytics", "analytics")
         ]
         
-        for action in quick_actions:
-            if st.button(action, key=f"quick_{action[:10]}"):
-                st.info(f"Opening {action}...")
+        for action_name, action_key in quick_actions:
+            if st.button(action_name, key=f"quick_{action_key}"):
+                st.session_state.notification = f"Opening {action_name}..."
+                st.rerun()
+        
+        st.markdown("#### Recent Searches")
+        
+        # Show recent search history
+        search_history = st.session_state.get('search_history', [])
+        
+        if search_history:
+            for search in search_history[:5]:  # Show last 5
+                query = search.get('query', '')
+                result_count = search.get('result_count', 0)
+                timestamp = search.get('timestamp', '')
+                
+                if timestamp:
+                    try:
+                        ts_dt = datetime.fromisoformat(timestamp)
+                        ts_str = ts_dt.strftime('%m/%d %H:%M')
+                    except:
+                        ts_str = timestamp[:16] if len(timestamp) >= 16 else timestamp
+                else:
+                    ts_str = 'Unknown'
+                
+                col_hist1, col_hist2 = st.columns([3, 1])
+                with col_hist1:
+                    st.write(f"• {query[:30]}...")
+                    st.caption(f"{ts_str} • {result_count} results")
+                with col_hist2:
+                    if st.button("🔄", key=f"rerun_{search.get('timestamp', '')[:10]}"):
+                        # Rerun this search
+                        st.session_state.search_query = query
+                        st.session_state.search_results = get_universal_search_results(query)
+                        st.rerun()
+        else:
+            st.info("No search history yet")
+        
+        # Clear history button
+        if search_history:
+            if st.button("🗑️ Clear History"):
+                st.session_state.search_history = []
+                DataSecurity.save_user_data('search_history', [])
+                st.success("✓ Search history cleared")
+                st.rerun()
         
         st.markdown("#### Search Insights")
         
-        insights = [
-            {"icon": "📈", "text": "Search volume up 15% this month"},
-            {"icon": "🎯", "text": "AI search accuracy: 94.2%"},
-            {"icon": "⚡", "text": "Avg search time: 0.8 seconds"},
-            {"icon": "📱", "text": "Mobile searches: 34%"}
-        ]
+        # Calculate insights from user's data
+        if search_history:
+            # Get most common search terms
+            all_queries = [s.get('query', '').lower() for s in search_history]
+            total_results = sum(s.get('result_count', 0) for s in search_history)
+            avg_results = total_results / len(search_history) if search_history else 0
+            
+            insights = [
+                {"icon": "📈", "text": f"Total searches: {search_history_count}"},
+                {"icon": "🎯", "text": f"Avg results: {avg_results:.1f}"},
+                {"icon": "📊", "text": f"{collections_count} collections"},
+                {"icon": "🔔", "text": f"{active_alerts} active alerts"}
+            ]
+        else:
+            insights = [
+                {"icon": "📈", "text": "Start searching to see insights"},
+                {"icon": "🎯", "text": "Track your search patterns"},
+                {"icon": "📊", "text": "Organize with collections"},
+                {"icon": "🔔", "text": "Set up alerts for automation"}
+            ]
         
         for insight in insights:
             col_insight1, col_insight2 = st.columns([1, 4])
@@ -1526,6 +1746,82 @@ def show_search_management():
                 st.write(insight["icon"])
             with col_insight2:
                 st.write(insight["text"])
+        
+        st.markdown("---")
+        st.markdown("#### Need Help?")
+        
+        help_topics = [
+            "📖 Search Syntax Guide",
+            "💡 Search Tips",
+            "🎓 Advanced Filters",
+            "❓ FAQ"
+        ]
+        
+        for topic in help_topics:
+            if st.button(topic, key=f"help_{topic[:5]}"):
+                st.info(f"Opening: {topic}")
+                
+def save_search_to_history(query, result_count):
+    """Save search query to user's history - SECURE"""
+    if not query:
+        return
+    
+    if 'search_history' not in st.session_state:
+        st.session_state.search_history = []
+    
+    search_entry = {
+        'query': query,
+        'timestamp': datetime.now().isoformat(),
+        'result_count': result_count,
+        'user': DataSecurity.get_current_user_email()
+    }
+    
+    # Add to beginning of list (most recent first)
+    st.session_state.search_history.insert(0, search_entry)
+    
+    # Keep only last 100 searches
+    st.session_state.search_history = st.session_state.search_history[:100]
+    
+    # Save to storage
+    DataSecurity.save_user_data('search_history', st.session_state.search_history)
+
+def save_search_collection(collection_name, items, tags):
+    """Save search collection - SECURE"""
+    if 'search_collections' not in st.session_state:
+        st.session_state.search_collections = []
+    
+    collection = {
+        'id': len(st.session_state.search_collections) + 1,
+        'name': collection_name,
+        'items': items,
+        'created': datetime.now().isoformat(),
+        'shared': False,
+        'tags': tags,
+        'user': DataSecurity.get_current_user_email()
+    }
+    
+    st.session_state.search_collections.append(collection)
+    DataSecurity.save_user_data('search_collections', st.session_state.search_collections)
+
+def save_search_query(query_name, query, alert_enabled=False):
+    """Save search query - SECURE"""
+    if 'saved_searches' not in st.session_state:
+        st.session_state.saved_searches = []
+    
+    saved_query = {
+        'id': len(st.session_state.saved_searches) + 1,
+        'name': query_name,
+        'query': query,
+        'created': datetime.now().isoformat(),
+        'last_run': datetime.now().isoformat(),
+        'alert': alert_enabled,
+        'results': 0,
+        'user': DataSecurity.get_current_user_email()
+    }
+    
+    st.session_state.saved_searches.append(saved_query)
+    DataSecurity.save_user_data('saved_searches', st.session_state.saved_searches)
+
 
 # Main execution
 if __name__ == "__main__":
