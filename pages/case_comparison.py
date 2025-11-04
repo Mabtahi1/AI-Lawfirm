@@ -322,16 +322,25 @@ def show():
         return
     
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["🆕 New Case Analysis", "📊 Bulk Comparison", "📈 Similarity Matrix"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🆕 New Case Analysis", 
+        "📊 Bulk Comparison", 
+        "📈 Similarity Matrix",
+        "📚 Comparison History"  # ADD THIS
+    ])
     
     with tab1:
-        show_new_case_comparison(subscription_manager, org_code, plan_name)
+        show_new_case_comparison(subscription_manager, org_code, plan_name, has_subscription)
     
     with tab2:
         show_bulk_comparison()
     
     with tab3:
         show_similarity_matrix()
+    
+    with tab4:  # ADD THIS
+        show_comparison_history()
+
 
 def show_upgrade_prompt(current_plan, status):
     """Show upgrade prompt when feature is not available"""
@@ -544,6 +553,14 @@ def show_new_case_comparison(subscription_manager, org_code, plan_name):
                     st.success("✨ Unlimited comparisons available")
             else:
                 st.success("✨ Demo mode - Unlimited comparisons")
+
+            st.success("✅ Analysis complete!")
+            
+            # ADD THIS SECTION:
+            # Save comparison to history
+            save_comparison_result(new_case, selected_cases, 78)
+            
+            # Show updated usage (only for non-enterprise)
             
             # Display mock results
             st.markdown("---")
@@ -636,7 +653,76 @@ RECOMMENDATIONS:
                 file_name=f"case_comparison_{new_case['id']}.txt",
                 mime="text/plain"
             )
-
+def show_comparison_history():
+    """Display user's case comparison history"""
+    st.subheader("📚 Comparison History")
+    
+    # Get user's comparison history
+    comparisons = get_comparison_history()
+    
+    if not comparisons:
+        st.info("📊 No comparison history yet. Complete a case analysis to see results here.")
+        return
+    
+    st.write(f"**Total Comparisons:** {len(comparisons)}")
+    
+    # Display each comparison
+    for idx, comp in enumerate(comparisons):
+        timestamp = comp.get('timestamp', '')
+        if timestamp:
+            try:
+                ts_dt = pd.Timestamp(timestamp)
+                ts_str = ts_dt.strftime('%Y-%m-%d %H:%M')
+            except:
+                ts_str = timestamp[:16] if len(timestamp) >= 16 else timestamp
+        else:
+            ts_str = 'Unknown'
+        
+        similarity = comp.get('similarity_score', 0)
+        
+        with st.expander(f"📄 {comp.get('case_title', 'Untitled')} - {ts_str} ({similarity}% similarity)"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write(f"**Case ID:** {comp.get('id', 'N/A')}")
+                st.write(f"**Type:** {comp.get('case_type', 'N/A')}")
+                st.write(f"**Compared With:** {comp.get('compared_with', 0)} cases")
+            
+            with col2:
+                st.write(f"**Similarity Score:** {similarity}%")
+                st.write(f"**Status:** {comp.get('status', 'N/A')}")
+                st.progress(similarity / 100)
+            
+            col_btn1, col_btn2, col_btn3 = st.columns(3)
+            
+            with col_btn1:
+                if st.button("📄 View Report", key=f"view_comp_{idx}"):
+                    st.info(f"Opening detailed report for {comp.get('case_title')}")
+            
+            with col_btn2:
+                if st.button("🔄 Rerun", key=f"rerun_comp_{idx}"):
+                    st.info("Rerunning comparison with updated data...")
+            
+            with col_btn3:
+                if st.button("🗑️ Delete", key=f"delete_comp_{idx}"):
+                    comparisons.pop(idx)
+                    DataSecurity.save_user_data('case_comparisons', comparisons)
+                    st.success("Comparison deleted")
+                    st.rerun()
+    
+    # Export all comparisons
+    st.markdown("---")
+    if st.button("📥 Export All Comparisons"):
+        import json
+        export_data = json.dumps(comparisons, indent=2)
+        
+        st.download_button(
+            label="Download JSON",
+            data=export_data,
+            file_name=f"case_comparisons_{pd.Timestamp.now().strftime('%Y%m%d')}.json",
+            mime="application/json"
+        )
+        
 def show_bulk_comparison():
     """Show bulk comparison interface"""
     st.subheader("Bulk Case Comparison")
