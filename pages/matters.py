@@ -686,35 +686,59 @@ def _show_create_matter_form(auth_service):
                                              placeholder="john@firm.com, jane@firm.com")
             tags = st.text_input("Tags (comma-separated)", placeholder="contract, urgent, technology")
         
-        if st.form_submit_button("🚀 Create Matter", type="primary"):
-            if matter_name and client_name:
-                new_matter = Matter(
-                    id=str(uuid.uuid4()),
-                    name=matter_name,
-                    client_id=str(uuid.uuid4()),
-                    client_name=client_name,
-                    matter_type=matter_type.lower().replace(' ', '_'),
-                    status='active',
-                    created_date=datetime.now(),
-                    assigned_attorneys=[email.strip() for email in assigned_attorneys.split(',') if email.strip()],
-                    description=description,
-                    budget=estimated_budget,
-                    estimated_hours=estimated_hours,
-                    actual_hours=0.0,
-                    hourly_rate=hourly_rate,
-                    priority=priority.lower(),
-                    deadline=datetime.combine(deadline, datetime.min.time()) if deadline else None,
-                    billing_contact=billing_contact,
-                    tags=[tag.strip() for tag in tags.split(',') if tag.strip()]
+        if st.form_submit_button("📤 Upload Document"):
+            if uploaded_file:
+                # Read file content
+                file_content = uploaded_file.read()
+                
+                # Generate document ID
+                doc_id = str(uuid.uuid4())
+                
+                # Save the ACTUAL FILE (not in JSON!)
+                file_path = DataSecurity.save_document(
+                    doc_id, 
+                    file_content, 
+                    uploaded_file.name, 
+                    uploaded_file.type
                 )
                 
-                st.session_state.matters.append(new_matter)
-                st.session_state['show_create_matter_form'] = False  # ✅ ADD THIS
-                st.success(f"✅ Matter '{matter_name}' created successfully!")
-                time.sleep(1)
-                st.rerun()
+                if file_path:
+                    # Save METADATA ONLY (no file content in JSON!)
+                    doc_metadata = {
+                        'id': doc_id,
+                        'matter_id': matter_id,
+                        'name': uploaded_file.name,
+                        'size': len(file_content),
+                        'type': uploaded_file.type,
+                        'mime_type': uploaded_file.type,
+                        'upload_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        'uploaded_by': st.session_state.get('user_data', {}).get('email', 'unknown'),
+                        'description': doc_description if doc_description else f"Document for {matter_name}",
+                        'tags': doc_tags,
+                        'security_level': doc_security,
+                        'status': 'Active',
+                        'version': '1.0',
+                        'matter_name': matter_name,
+                        'client_name': matter_client,
+                        'document_type': doc_tags[0] if doc_tags else 'general',
+                        'path': file_path  # Store path, NOT content!
+                    }
+                    
+                    # Add to documents list
+                    if 'documents' not in st.session_state:
+                        st.session_state.documents = []
+                    
+                    st.session_state.documents.append(doc_metadata)
+                    
+                    # Save documents metadata (NO file content!)
+                    DataSecurity.save_user_data('documents', st.session_state.documents)
+                    
+                    st.success(f"✅ Document '{uploaded_file.name}' uploaded successfully!")
+                    st.rerun()
+                else:
+                    st.error("Failed to save document")
             else:
-                st.error("❌ Please fill in all required fields.")
+                st.error("Please select a file to upload")
         
         # ADD CANCEL BUTTON:
         if st.form_submit_button("❌ Cancel"):
@@ -932,14 +956,28 @@ def _show_matter_card(matter, auth_service):
                 with col_doc_name:
                     st.markdown(f"• {status_emoji.get(doc_status, '📄')} {doc_name} ({doc_type})")
                 with col_doc_action:
-                    if isinstance(doc, dict) and 'content' in doc:
-                        st.download_button(
-                            label="⬇️",
-                            data=doc['content'],
-                            file_name=doc_name,
-                            mime=doc.get('mime_type', 'application/octet-stream'),
-                            key=f"download_{doc.get('id', uuid.uuid4())}"
-                        )
+                    # Get document ID and name
+                    if isinstance(doc, dict):
+                        doc_id = doc.get('id')
+                        doc_name_file = doc.get('name')
+                    else:
+                        doc_id = getattr(doc, 'id', None)
+                        doc_name_file = getattr(doc, 'name', 'document')
+                    
+                    if doc_id and doc_name_file:
+                        # Retrieve actual file content
+                        file_content = DataSecurity.get_document(doc_id, doc_name_file)
+                        
+                        if file_content:
+                            st.download_button(
+                                label="⬇️",
+                                data=file_content,
+                                file_name=doc_name_file,
+                                mime=doc.get('mime_type', 'application/octet-stream') if isinstance(doc, dict) else getattr(doc, 'mime_type', 'application/octet-stream'),
+                                key=f"download_{doc_id}"
+                            )
+                        else:
+                            st.write("❌")
 
         # Document Upload Section
         if auth_service.has_permission('write'):
