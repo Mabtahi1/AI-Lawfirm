@@ -80,7 +80,7 @@ class PaymentService:
             subscription = stripe.Subscription.create(
                 customer=customer_id,
                 items=[{'price': price_id}],
-                trial_period_days=14,
+                trial_period_days=3,
                 metadata={'plan': plan_name}
             )
             return subscription
