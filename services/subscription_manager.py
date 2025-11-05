@@ -285,32 +285,45 @@ class EnhancedAuthService:
         email = email.lower().strip()
         organization_code = organization_code.lower().strip()
         
+        # Initialize users if not exists
+        if 'users' not in st.session_state:
+            st.session_state.users = {}
+        
+        # Initialize subscriptions if not exists
+        if 'subscriptions' not in st.session_state:
+            st.session_state.subscriptions = {}
+        
         # Validation
-        if email in st.session_state.users_db:
+        if email in st.session_state.users:
             return False, "Email already exists"
         
-        if any(u.get('organization_code') == organization_code 
-               for u in st.session_state.users_db.values()):
+        if any(u.get('data', {}).get('organization_code') == organization_code 
+               for u in st.session_state.users.values()):
             return False, "Organization code already taken"
         
         # Create user
-        st.session_state.users_db[email] = {
-            'password': self.hash_password(password),
-            'name': name,
-            'organization_name': organization_name,
-            'organization_code': organization_code,
-            'role': 'subscription_owner',
-            'created_at': datetime.now().isoformat(),
-            'email_verified': True
+        st.session_state.users[email] = {
+            'password': AuthTokenManager.hash_password(password),
+            'data': {
+                'name': name,
+                'first_name': name.split()[0] if name else '',
+                'email': email,
+                'organization_name': organization_name,
+                'organization_code': organization_code,
+                'role': 'subscription_owner',
+                'is_subscription_owner': True,
+                'email_verified': True,
+                'created_at': datetime.now().isoformat()
+            }
         }
         
-        # Create subscription
+        # Create subscription (ACTIVE, no trial)
         st.session_state.subscriptions[organization_code] = {
             'plan': plan,
-            'status': 'trial',
+            'status': 'active',  # ✅ Changed from 'trial' to 'active'
             'start_date': datetime.now().isoformat(),
-            'trial_end': (datetime.now() + timedelta(days=14)).isoformat(),
             'billing_cycle': 'monthly'
+            # ✅ Removed trial_end field
         }
         
         return True, "Account created successfully"
