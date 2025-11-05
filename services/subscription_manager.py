@@ -280,8 +280,9 @@ class EnhancedAuthService:
             return role in ['admin', 'subscription_owner']
         
         return False
+    
     def register(self, email, password, name, organization_name, organization_code, plan='basic'):
-        """Register new user"""
+        """Register new user - FIXED VERSION"""
         email = email.lower().strip()
         organization_code = organization_code.lower().strip()
         
@@ -301,7 +302,7 @@ class EnhancedAuthService:
                for u in st.session_state.users.values()):
             return False, "Organization code already taken"
         
-        # Create user
+        # Create user with proper nested structure
         st.session_state.users[email] = {
             'password': AuthTokenManager.hash_password(password),
             'data': {
@@ -317,19 +318,18 @@ class EnhancedAuthService:
             }
         }
         
-        # Create subscription (ACTIVE, no trial)
+        # Create subscription (ACTIVE - payment already processed)
         st.session_state.subscriptions[organization_code] = {
             'plan': plan,
-            'status': 'active',  # ✅ Changed from 'trial' to 'active'
+            'status': 'active',
             'start_date': datetime.now().isoformat(),
             'billing_cycle': 'monthly'
-            # ✅ Removed trial_end field
         }
         
         return True, "Account created successfully"
     
     def show_login(self):
-        """Show login/signup page"""
+        """Show login/signup page with payment integration"""
         
         # CSS Styling
         st.markdown("""
@@ -343,6 +343,9 @@ class EnhancedAuthService:
         # Initialize session state for form toggle
         if 'show_signup_form' not in st.session_state:
             st.session_state.show_signup_form = False
+        
+        if 'show_payment_form' not in st.session_state:
+            st.session_state.show_payment_form = False
     
         # Center container
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -356,9 +359,64 @@ class EnhancedAuthService:
             </div>
             """, unsafe_allow_html=True)
     
-            # Show either login or signup form
-            if not st.session_state.show_signup_form:
-                # ============= LOGIN FORM =============
+            # ============= PAYMENT FORM (Step 2) =============
+            if st.session_state.show_payment_form:
+                from services.payment_service import PaymentService
+                
+                st.markdown("### 💳 Complete Your Payment")
+                
+                # Back button
+                if st.button("← Back to Signup", use_container_width=True):
+                    st.session_state.show_payment_form = False
+                    st.rerun()
+                
+                st.markdown("---")
+                
+                # Show what they're signing up for
+                signup_data = st.session_state.get('temp_signup_data', {})
+                plan_name = signup_data.get('plan', 'basic')
+                plan_details = SUBSCRIPTION_PLANS.get(plan_name, {})
+                
+                st.info(f"""
+                **Organization:** {signup_data.get('organization_name')}  
+                **Email:** {signup_data.get('email')}  
+                **Plan:** {plan_details.get('name', 'Basic')} - ${plan_details.get('price', 0)}/month
+                """)
+                
+                # Payment form
+                payment_service = PaymentService()
+                
+                def complete_registration():
+                    """Callback after successful payment"""
+                    data = st.session_state.temp_signup_data
+                    success, message = self.register(
+                        email=data['email'],
+                        password=data['password'],
+                        name=data['name'],
+                        organization_name=data['organization_name'],
+                        organization_code=data['organization_code'],
+                        plan=data['plan']
+                    )
+                    
+                    if success:
+                        st.session_state.show_payment_form = False
+                        st.session_state.show_signup_form = False
+                        st.session_state.temp_signup_data = None
+                        st.success("✅ Account created successfully! Please login.")
+                        import time
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Error creating account: {message}")
+                
+                # Show payment form
+                payment_success = payment_service.show_payment_form(
+                    plan_name=plan_name,
+                    on_success_callback=complete_registration
+                )
+            
+            # ============= LOGIN FORM =============
+            elif not st.session_state.show_signup_form:
                 st.markdown("### 🔑 Login to Your Account")
                 
                 # Demo accounts
@@ -395,10 +453,10 @@ class EnhancedAuthService:
                     st.session_state.show_signup_form = True
                     st.rerun()
     
+            # ============= SIGNUP FORM (Step 1) =============
             else:
-                # ============= SIGNUP FORM =============
                 st.markdown("### ✨ Create Your Account")
-                st.info("🎉 14-day free trial. No credit card required!")
+                st.info("💳 Payment required to activate your account")
                 
                 with st.form("signup_form"):
                     st.markdown("#### 🏢 Organization")
@@ -420,20 +478,27 @@ class EnhancedAuthService:
                     with col_b:
                         confirm_password = st.text_input("🔒 Confirm*", type="password")
                     
-                    st.markdown("#### 💳 Choose Plan")
-                    plan = st.selectbox("Select Plan", [
-                        "Starter - $299/month",
-                        "Professional - $599/month",
-                        "Enterprise - $999/month"
-                    ])
+                    st.markdown("#### 💳 Choose Your Plan")
                     
-                    agree = st.checkbox("I agree to Terms of Service")
+                    # Plan selection with pricing
+                    plan_option = st.radio(
+                        "Select Plan",
+                        [
+                            "Starter - $299/month - Basic features only",
+                            "Professional - $599/month - AI features (limited usage)",
+                            "Enterprise - $999/month - Unlimited AI features"
+                        ],
+                        help="Choose the plan that fits your needs"
+                    )
                     
-                    submitted = st.form_submit_button("🚀 Create Account", use_container_width=True)
+                    agree = st.checkbox("I agree to Terms of Service and authorize monthly payments")
+                    
+                    submitted = st.form_submit_button("Continue to Payment →", use_container_width=True, type="primary")
                     
                     if submitted:
                         errors = []
                         
+                        # Validation
                         if not all([org_name, org_code, first_name, last_name, email, password]):
                             errors.append("All fields required")
                         if password and len(password) < 8:
@@ -441,7 +506,7 @@ class EnhancedAuthService:
                         if password != confirm_password:
                             errors.append("Passwords don't match")
                         if not agree:
-                            errors.append("Must agree to Terms")
+                            errors.append("Must agree to Terms and authorize payments")
                         if org_code and (' ' in org_code or org_code != org_code.lower()):
                             errors.append("Org code: lowercase, no spaces")
                         
@@ -449,28 +514,27 @@ class EnhancedAuthService:
                             for error in errors:
                                 st.error(f"⚠️ {error}")
                         else:
-                            plan_name = "basic" if "Starter" in plan else (
-                                "professional" if "Professional" in plan else "enterprise"
-                            )
-                            
-                            success, message = self.register(
-                                email=email,
-                                password=password,
-                                name=f"{first_name} {last_name}",
-                                organization_name=org_name,
-                                organization_code=org_code,
-                                plan=plan_name
-                            )
-                            
-                            if success:
-                                st.success("✅ Account created!")
-                                st.balloons()
-                                import time
-                                time.sleep(2)
-                                st.session_state.show_signup_form = False
-                                st.rerun()
+                            # Determine plan
+                            if "Starter" in plan_option:
+                                plan_name = "basic"
+                            elif "Professional" in plan_option:
+                                plan_name = "professional"
                             else:
-                                st.error(f"❌ {message}")
+                                plan_name = "enterprise"
+                            
+                            # Store signup data temporarily
+                            st.session_state.temp_signup_data = {
+                                'email': email,
+                                'password': password,
+                                'name': f"{first_name} {last_name}",
+                                'organization_name': org_name,
+                                'organization_code': org_code,
+                                'plan': plan_name
+                            }
+                            
+                            # Move to payment form
+                            st.session_state.show_payment_form = True
+                            st.rerun()
                 
                 # Back to login button
                 st.markdown("<br>", unsafe_allow_html=True)
