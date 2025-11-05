@@ -142,7 +142,7 @@ class PaymentService:
         ">
             <h2>{plan_details['name']}</h2>
             <h1>${amount}/month</h1>
-            <p>14-day free trial • Cancel anytime</p>
+            <p>3-day free trial • Cancel anytime</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -180,7 +180,7 @@ class PaymentService:
             # Terms
             st.markdown("""
             **By clicking "Start Trial", you agree to:**
-            - 14-day free trial starting today
+            - 3-day free trial starting today
             - Automatic billing of ${}/month after trial
             - You can cancel anytime before trial ends
             """.format(amount))
