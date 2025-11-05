@@ -332,7 +332,7 @@ def show():
             st.success("✓ Current Plan")
         else:
             if st.button("Contact Sales", key="basic_contact", use_container_width=True):
-                st.session_state.billing_notification = "📧 Please contact support@legaldocpro.com to change plans"
+                st.session_state.billing_notification = "📧 Please contact mehdi.abtahi@prolexisanalytics.com to change plans"
                 st.rerun()
     
     with col2:
@@ -360,7 +360,7 @@ def show():
                 handle_upgrade(subscription_manager, org_code, 'professional')
         else:
             if st.button("Change to Professional", key="prof_change", use_container_width=True):
-                st.info("Contact support@legaldocpro.com to change plans")
+                st.info("Contact mehdi.abtahi@prolexisanalytics.com to change plans")
     
     with col3:
         st.markdown("""
