@@ -5,11 +5,24 @@ from services.data_security import DataSecurity
 def show():
     """Display the case comparison page"""
     
-    # Require authentication
-    DataSecurity.require_auth("AI Case Comparison")
+    # ✅ Check authentication without forcing re-auth
+    if 'user_data' not in st.session_state or not st.session_state.user_data:
+        st.error("⚠️ Please log in to access AI Case Comparison")
+        st.stop()
+        return
     
     # Get user's organization securely
-    user_email = DataSecurity.get_current_user_email()
+    try:
+        user_email = DataSecurity.get_current_user_email()
+        if not user_email:
+            st.error("⚠️ Session expired. Please log in again.")
+            st.stop()
+            return
+    except Exception as e:
+        st.error(f"⚠️ Authentication error: {e}")
+        st.stop()
+        return
+    
     user_data = st.session_state.get('user_data', {})
     org_code = user_data.get('organization_code', user_email)
     
@@ -469,7 +482,7 @@ def show_new_case_comparison(subscription_manager, org_code, plan_name, has_subs
         if not all_matters:
             st.warning("No previous cases found. Please add some matters first.")
             if st.button("➕ Go to Matter Management"):
-                st.session_state['current_page'] = 'Matter Management'
+                st.session_state = 'Matter Management'
                 st.rerun()
             return
         
