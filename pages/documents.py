@@ -282,6 +282,11 @@ def show():
 def show_dashboard_stats():
     """Show dashboard with REAL user data"""
     
+    # Check if viewing a document
+    if st.session_state.current_viewing_doc:
+        display_document_viewer(st.session_state.current_viewing_doc)
+        return
+    
     # Get REAL user documents
     documents = DataSecurity.get_user_documents()
     
@@ -339,8 +344,13 @@ def show_dashboard_stats():
         st.info("No documents uploaded yet. Use the Upload tab to add your first document.")
 
 def show_document_viewer(doc):
-    """View document content"""
-    st.markdown("---")
+    """View document content - sets viewing state"""
+    st.session_state.current_viewing_doc = doc
+    st.rerun()
+
+
+def display_document_viewer(doc):
+    """Display document viewer interface"""
     st.markdown("### 📄 Document Viewer")
     
     doc_name = doc.get('name', 'Unknown')
@@ -348,18 +358,100 @@ def show_document_viewer(doc):
     doc_description = doc.get('description', 'No description')
     doc_tags = doc.get('tags', [])
     doc_id = doc.get('id')
+    doc_size = doc.get('size', 'Unknown')
+    upload_date = doc.get('upload_date', '')
+    uploaded_by = doc.get('uploaded_by', 'Unknown')
     
-    col1, col2 = st.columns([3, 1])
+    # Parse upload date
+    if upload_date:
+        try:
+            dt = datetime.fromisoformat(upload_date)
+            upload_date_str = dt.strftime('%Y-%m-%d %H:%M')
+        except:
+            upload_date_str = str(upload_date)[:16]
+    else:
+        upload_date_str = 'Unknown'
+    
+    # Close button at top
+    if st.button("❌ Close Viewer", key="close_viewer_top"):
+        st.session_state.current_viewing_doc = None
+        st.rerun()
+    
+    st.markdown("---")
+    
+    # Document information
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.write(f"**Document:** {doc_name}")
+        st.markdown("#### 📋 Document Info")
+        st.write(f"**Name:** {doc_name}")
         st.write(f"**Type:** {doc_type}")
-        st.write(f"**Description:** {doc_description}")
-        
+        st.write(f"**Size:** {doc_size}")
+    
+    with col2:
+        st.markdown("#### 📅 Details")
+        st.write(f"**Uploaded:** {upload_date_str}")
+        st.write(f"**By:** {uploaded_by}")
+        st.write(f"**Status:** {doc.get('status', 'Unknown').title()}")
+    
+    with col3:
+        st.markdown("#### 🏷️ Metadata")
+        st.write(f"**Privileged:** {'Yes ⚖️' if doc.get('is_privileged') else 'No'}")
         if doc_tags:
             st.write(f"**Tags:** {', '.join(doc_tags)}")
+        else:
+            st.write("**Tags:** None")
+    
+    # Description
+    if doc_description and doc_description != 'No description':
+        st.markdown("#### 📝 Description")
+        st.write(doc_description)
+    
+    st.markdown("---")
+    
+    # Document preview and download
+    col_action1, col_action2 = st.columns([2, 1])
+    
+    with col_action1:
+        st.markdown("#### 📄 Document Content")
         
         # Get actual file content
+        if doc_id and doc_name:
+            file_content = DataSecurity.get_document(doc_id, doc_name)
+            
+            if file_content:
+                # Check file type for preview
+                mime_type = doc.get('mime_type', '')
+                
+                if 'text' in mime_type or doc_name.endswith('.txt'):
+                    # Text preview
+                    try:
+                        text_content = file_content.decode('utf-8', errors='ignore')
+                        st.text_area("Text Preview", text_content[:2000], height=300, disabled=True)
+                        if len(text_content) > 2000:
+                            st.info("Showing first 2000 characters. Download to see full content.")
+                    except:
+                        st.info("Cannot preview this file type. Please download to view.")
+                
+                elif 'image' in mime_type or doc_name.endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                    # Image preview
+                    st.image(file_content, caption=doc_name, use_container_width=True)
+                
+                elif 'pdf' in mime_type or doc_name.endswith('.pdf'):
+                    st.info("📄 PDF Preview: Download the file to view full content")
+                
+                else:
+                    st.info(f"Preview not available for {doc_type} files. Download to view.")
+                
+            else:
+                st.warning("File content not available")
+        else:
+            st.info("No content available for preview")
+    
+    with col_action2:
+        st.markdown("#### ⚡ Quick Actions")
+        
+        # Download button
         if doc_id and doc_name:
             file_content = DataSecurity.get_document(doc_id, doc_name)
             
@@ -368,16 +460,32 @@ def show_document_viewer(doc):
                     label="📥 Download Document",
                     data=file_content,
                     file_name=doc_name,
-                    mime=doc.get('mime_type', 'application/octet-stream')
+                    mime=doc.get('mime_type', 'application/octet-stream'),
+                    use_container_width=True,
+                    key="download_viewer"
                 )
             else:
-                st.info("File content not available")
-        else:
-            st.info("No content available for preview")
+                st.button("📥 Download (N/A)", disabled=True, use_container_width=True)
+        
+        # Other actions
+        if st.button("✏️ Edit Metadata", use_container_width=True):
+            st.info("Edit functionality coming soon")
+        
+        if st.button("📤 Share", use_container_width=True):
+            st.info("Share functionality coming soon")
+        
+        if st.button("🗑️ Delete Document", use_container_width=True):
+            if st.button("⚠️ Confirm Delete", use_container_width=True, type="primary"):
+                delete_document(doc)
+                st.session_state.current_viewing_doc = None
+                st.rerun()
     
-    with col2:
-        if st.button("❌ Close Viewer"):
-            st.rerun()
+    st.markdown("---")
+    
+    # Close button at bottom
+    if st.button("❌ Close Viewer", key="close_viewer_bottom"):
+        st.session_state.current_viewing_doc = None
+        st.rerun()
 
 def show_upload_interface():
     """SECURE document upload interface"""
@@ -518,6 +626,11 @@ def process_document_upload(uploaded_file, title, doc_type, matter_id, tags, is_
 
 def show_search_and_filter():
     """Document search with REAL user data"""
+    
+    # ✅ Check if viewing a document
+    if st.session_state.current_viewing_doc:
+        display_document_viewer(st.session_state.current_viewing_doc)
+        return
     st.subheader("🔍 Search & Filter Documents")
     
     # Get REAL documents
