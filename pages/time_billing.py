@@ -361,20 +361,33 @@ def show_billing_metrics():
     time_entries = [dict_to_obj(entry) if isinstance(entry, dict) else entry 
                    for entry in st.session_state.get('time_entries', [])]
     
-    # Calculate metrics using getattr() and handle datetime objects
+    # ✅ FIX: Handle both datetime objects and strings
+    def get_entry_date(entry):
+        """Safely get datetime from entry"""
+        date_val = getattr(entry, 'date', None)
+        if isinstance(date_val, str):
+            try:
+                return datetime.strptime(date_val, '%Y-%m-%d')
+            except:
+                return None
+        elif isinstance(date_val, datetime):
+            return date_val
+        return None
+    
+    # Calculate metrics using safe date comparison
     this_month_hours = sum(
         getattr(entry, 'hours', 0) for entry in time_entries
-        if isinstance(getattr(entry, 'date', None), str) and 
-           datetime.strptime(getattr(entry, 'date'), '%Y-%m-%d').month == current_month and
-           datetime.strptime(getattr(entry, 'date'), '%Y-%m-%d').year == current_year
+        if (entry_date := get_entry_date(entry)) and 
+           entry_date.month == current_month and
+           entry_date.year == current_year
     )
     
     this_month_revenue = sum(
         getattr(entry, 'hours', 0) * getattr(entry, 'rate', 0)
         for entry in time_entries
-        if isinstance(getattr(entry, 'date', None), str) and 
-           datetime.strptime(getattr(entry, 'date'), '%Y-%m-%d').month == current_month and
-           datetime.strptime(getattr(entry, 'date'), '%Y-%m-%d').year == current_year
+        if (entry_date := get_entry_date(entry)) and 
+           entry_date.month == current_month and
+           entry_date.year == current_year
     )
     
     total_unbilled_hours = sum(
@@ -497,10 +510,10 @@ def show_time_tracking():
                 # Get default rate from settings
                 default_rate = st.session_state.billing_settings.get('default_rate', 250.0)
                 
-                # Save time entry immediately
+                # ✅ FIX: Use string format for date consistently
                 new_entry = {
                     'id': len(st.session_state.time_entries) + 1,
-                    'date': datetime.now().strftime('%Y-%m-%d'),
+                    'date': datetime.now().strftime('%Y-%m-%d'),  # ✅ String format
                     'matter': timer_matter,
                     'activity': timer_activity,
                     'description': timer_desc if timer_desc else f"Timer entry - {timer_activity}",
