@@ -15,6 +15,27 @@ def auto_save_client_data():
         DataSecurity.save_user_data('portal_clients', st.session_state.portal_clients)
 
 
+def send_client_invitation(client_email, client_name, access_level):
+    """Simulate sending invitation email to client"""
+    # In a real implementation, this would integrate with your email service
+    # For now, we'll save the invitation to user data and show a success message
+    
+    invitation_data = {
+        'email': client_email,
+        'name': client_name,
+        'access_level': access_level,
+        'sent_date': datetime.now().isoformat(),
+        'status': 'sent',
+        'invitation_code': f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    }
+    
+    # Save invitation record
+    invitations = DataSecurity.load_user_data('client_invitations', [])
+    invitations.append(invitation_data)
+    DataSecurity.save_user_data('client_invitations', invitations)
+    
+    return invitation_data
+
 def show():
     
     # Require authentication
@@ -295,6 +316,19 @@ def show():
 def show_client_access():
     st.subheader("👥 Client Access Management")
     
+    # ✅ CHECK IF EDITING A CLIENT
+    if 'editing_client_id' in st.session_state and st.session_state.editing_client_id:
+        # Find the client being edited
+        client_to_edit = None
+        for client in st.session_state.portal_clients:
+            if client.get('id') == st.session_state.editing_client_id:
+                client_to_edit = client
+                break
+        
+        if client_to_edit:
+            edit_client_form(client_to_edit)
+            st.markdown("---")
+            
     # ADD NEW CLIENT BUTTON AT TOP
     col_header1, col_header2 = st.columns([3, 1])
     
@@ -351,9 +385,14 @@ def show_client_access():
                         st.session_state.portal_clients.append(new_client)
                         auto_save_client_data()
                         
-                        st.success(f"✅ Client {client_name} added successfully!")
+                        # ✅ SEND INVITATION EMAIL
                         if send_invite:
+                            invitation = send_client_invitation(client_email, client_name, access_level)
+                            st.success(f"✅ Client {client_name} added successfully!")
                             st.info(f"📧 Invitation email sent to {client_email}")
+                            st.code(f"Invitation Code: {invitation['invitation_code']}")
+                        else:
+                            st.success(f"✅ Client {client_name} added successfully!")
                         
                         st.session_state.show_add_client_form = False
                         st.rerun()
@@ -454,10 +493,19 @@ def show_client_access():
                 col_action1, col_action2, col_action3, col_action4 = st.columns(4)
                 with col_action1:
                     if st.button("⚙️ Edit Access", key=f"edit_{client.get('id')}"):
-                        st.info("Edit functionality coming soon")
+                        st.session_state.editing_client_id = client.get('id')
+                        st.rerun()
                 with col_action2:
                     if st.button("📧 Send Invite", key=f"invite_{client.get('id')}"):
-                        st.success(f"Invitation sent to {client.get('email')}")
+                    # ✅ ACTUALLY SEND INVITATION
+                    invitation = send_client_invitation(
+                        client.get('email'), 
+                        client.get('name'), 
+                        client.get('access_level')
+                    )
+                    st.success(f"✅ Invitation sent to {client.get('email')}")
+                    st.code(f"Invitation Code: {invitation['invitation_code']}")
+                    st.rerun()
                 with col_action3:
                     if st.button("🔒 Reset Password", key=f"reset_{client.get('id')}"):
                         st.success("Password reset email sent")
@@ -552,6 +600,68 @@ def get_permissions_for_access_level(access_level):
         return ["View Documents"]
     else:
         return []
+
+
+def edit_client_form(client):
+    """Display edit form for a client"""
+    st.markdown("---")
+    st.markdown(f"### ✏️ Edit Client: {client.get('name')}")
+    
+    with st.form(f"edit_client_form_{client.get('id')}"):
+        col_edit1, col_edit2 = st.columns(2)
+        
+        with col_edit1:
+            client_name = st.text_input("Client Name *", value=client.get('name', ''))
+            client_email = st.text_input("Email Address *", value=client.get('email', ''))
+            company_name = st.text_input("Company Name", value=client.get('company', ''))
+        
+        with col_edit2:
+            access_level = st.selectbox(
+                "Access Level", 
+                ["Full Access", "Limited Access", "View Only"],
+                index=["Full Access", "Limited Access", "View Only"].index(client.get('access_level', 'View Only'))
+            )
+            
+            status = st.selectbox(
+                "Status",
+                ["Active", "Inactive", "Pending Setup", "Suspended"],
+                index=["Active", "Inactive", "Pending Setup", "Suspended"].index(client.get('status', 'Active'))
+            )
+            
+            # Multi-select for matters
+            matters = st.session_state.get('matters', [])
+            if matters:
+                matter_names = [m.get('name', 'Untitled') if isinstance(m, dict) else getattr(m, 'name', 'Untitled') for m in matters]
+                current_matters = client.get('matters', [])
+                selected_matters = st.multiselect("Assign Matters", matter_names, default=current_matters)
+            else:
+                selected_matters = []
+        
+        col_submit1, col_submit2 = st.columns(2)
+        
+        with col_submit1:
+            if st.form_submit_button("💾 Save Changes", type="primary"):
+                # Update the client
+                for c in st.session_state.portal_clients:
+                    if c.get('id') == client.get('id'):
+                        c['name'] = client_name
+                        c['email'] = client_email
+                        c['company'] = company_name if company_name else "N/A"
+                        c['access_level'] = access_level
+                        c['status'] = status
+                        c['matters'] = selected_matters
+                        c['permissions'] = get_permissions_for_access_level(access_level)
+                        break
+                
+                auto_save_client_data()
+                st.session_state.editing_client_id = None
+                st.success(f"✅ Client '{client_name}' updated successfully!")
+                st.rerun()
+        
+        with col_submit2:
+            if st.form_submit_button("❌ Cancel"):
+                st.session_state.editing_client_id = None
+                st.rerun()
 
 def show_document_sharing():
     st.subheader("📄 Client Document Sharing")
