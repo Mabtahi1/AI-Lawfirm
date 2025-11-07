@@ -1701,7 +1701,7 @@ def show_search_management():
                     st.write(f"• {query[:30]}...")
                     st.caption(f"{ts_str} • {result_count} results")
                 with col_hist2:
-                    if st.button("🔄", key=f"rerun_{search.get('timestamp', '')[:10]}"):
+                    if st.button("🔄", key=f"rerun_search_{idx}"):
                         # Rerun this search
                         st.session_state.search_query = query
                         st.session_state.search_results = get_universal_search_results(query)
