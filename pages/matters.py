@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
 from types import SimpleNamespace
+from services.data_security import DataSecurity
 
 def dict_to_obj(d):
     return SimpleNamespace(**d)
@@ -686,64 +687,120 @@ def _show_create_matter_form(auth_service):
                                              placeholder="john@firm.com, jane@firm.com")
             tags = st.text_input("Tags (comma-separated)", placeholder="contract, urgent, technology")
         
-        if st.form_submit_button("📤 Upload Document"):
-            if uploaded_file:
-                # Read file content
-                file_content = uploaded_file.read()
-                
-                # Generate document ID
-                doc_id = str(uuid.uuid4())
-                
-                # Save the ACTUAL FILE (not in JSON!)
-                file_path = DataSecurity.save_document(
-                    doc_id, 
-                    file_content, 
-                    uploaded_file.name, 
-                    uploaded_file.type
-                )
-                
-                if file_path:
-                    # Save METADATA ONLY (no file content in JSON!)
-                    doc_metadata = {
-                        'id': doc_id,
-                        'matter_id': matter_id,
-                        'name': uploaded_file.name,
-                        'size': len(file_content),
-                        'type': uploaded_file.type,
-                        'mime_type': uploaded_file.type,
-                        'upload_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        'uploaded_by': st.session_state.get('user_data', {}).get('email', 'unknown'),
-                        'description': doc_description if doc_description else f"Document for {matter_name}",
-                        'tags': doc_tags,
-                        'security_level': doc_security,
-                        'status': 'Active',
-                        'version': '1.0',
-                        'matter_name': matter_name,
-                        'client_name': matter_client,
-                        'document_type': doc_tags[0] if doc_tags else 'general',
-                        'path': file_path  # Store path, NOT content!
-                    }
+        # ADD FILE UPLOADER FIELD
+        st.markdown("---")
+        st.markdown("#### Optional: Attach Initial Document")
+        uploaded_file = st.file_uploader(
+            "Upload document (optional)",
+            type=['pdf', 'docx', 'txt', 'xlsx', 'png', 'jpg', 'jpeg'],
+            key="create_matter_file_upload"
+        )
+        
+        if uploaded_file:
+            st.info(f"📄 File ready to upload: {uploaded_file.name} ({uploaded_file.size / 1024:.1f} KB)")
+        
+        # SUBMIT BUTTONS
+        st.markdown("---")
+        col_submit1, col_submit2 = st.columns(2)
+        
+        with col_submit1:
+            if st.form_submit_button("✅ Create Matter", type="primary"):
+                if matter_name and client_name and matter_type:
+                    # Create the matter first
+                    new_matter = Matter(
+                        id=str(uuid.uuid4()),
+                        name=matter_name,
+                        client_id=str(uuid.uuid4()),
+                        client_name=client_name,
+                        matter_type=matter_type.lower().replace(' ', '_'),
+                        status='active',
+                        created_date=datetime.now(),
+                        assigned_attorneys=[a.strip() for a in assigned_attorneys.split(',') if a.strip()],
+                        description=description,
+                        budget=estimated_budget,
+                        estimated_hours=estimated_hours,
+                        hourly_rate=hourly_rate,
+                        priority=priority.lower(),
+                        deadline=datetime.combine(deadline, datetime.min.time()) if deadline else None,
+                        billing_contact=billing_contact,
+                        tags=[tag.strip() for tag in tags.split(',') if tag.strip()]
+                    )
                     
-                    # Add to documents list
-                    if 'documents' not in st.session_state:
-                        st.session_state.documents = []
+                    st.session_state.matters.append(new_matter)
                     
-                    st.session_state.documents.append(doc_metadata)
+                    # Handle file upload if provided
+                    if uploaded_file:
+                        try:
+                            from services.data_security import DataSecurity
+                            
+                            # Read file content
+                            uploaded_file.seek(0)  # Reset file pointer
+                            file_content = uploaded_file.read()
+                            
+                            # Generate document ID
+                            doc_id = str(uuid.uuid4())
+                            
+                            # Save the ACTUAL FILE
+                            file_path = DataSecurity.save_document(
+                                doc_id, 
+                                file_content, 
+                                uploaded_file.name, 
+                                uploaded_file.type
+                            )
+                            
+                            if file_path:
+                                # Save METADATA ONLY (no file content in JSON!)
+                                doc_metadata = {
+                                    'id': doc_id,
+                                    'matter_id': new_matter.id,
+                                    'name': uploaded_file.name,
+                                    'size': f"{len(file_content) / 1024:.1f} KB",
+                                    'size_bytes': len(file_content),
+                                    'type': 'general',
+                                    'mime_type': uploaded_file.type,
+                                    'upload_date': datetime.now().isoformat(),
+                                    'uploaded_by': st.session_state.get('user_data', {}).get('email', 'unknown'),
+                                    'description': f"Initial document for {matter_name}",
+                                    'tags': [tag.strip() for tag in tags.split(',') if tag.strip()],
+                                    'security_level': 'Standard',
+                                    'status': 'active',
+                                    'version': '1.0',
+                                    'matter_name': matter_name,
+                                    'client_name': client_name,
+                                    'document_type': 'general',
+                                    'path': file_path  # Store path, NOT content!
+                                }
+                                
+                                # Add to documents list
+                                if 'documents' not in st.session_state:
+                                    st.session_state.documents = []
+                                
+                                st.session_state.documents.append(doc_metadata)
+                                
+                                # Save documents metadata (NO file content!)
+                                DataSecurity.save_user_data('documents', st.session_state.documents)
+                                
+                                st.success(f"✅ Document '{uploaded_file.name}' uploaded successfully!")
+                            else:
+                                st.warning(f"⚠️ Matter created but document upload failed")
+                        
+                        except Exception as e:
+                            st.warning(f"⚠️ Matter created but document upload failed: {str(e)}")
                     
-                    # Save documents metadata (NO file content!)
-                    DataSecurity.save_user_data('documents', st.session_state.documents)
+                    # Save matters
+                    DataSecurity.save_user_data('matters', st.session_state.matters)
                     
-                    st.success(f"✅ Document '{uploaded_file.name}' uploaded successfully!")
+                    st.success(f"✅ Matter '{matter_name}' created successfully!")
+                    st.session_state.show_create_matter_form = False
+                    time.sleep(1)
                     st.rerun()
                 else:
-                    st.error("Failed to save document")
-            else:
-                st.error("Please select a file to upload")
+                    st.error("❌ Please fill in all required fields (Matter Name, Client Name, Matter Type)")
         
-        # ADD CANCEL BUTTON:
-        if st.form_submit_button("❌ Cancel"):
-            st.session_state['show_create_matter_form'] = False
-            st.rerun()
+        with col_submit2:
+            if st.form_submit_button("❌ Cancel"):
+                st.session_state.show_create_matter_form = False
+                st.rerun()
 
 def _show_matter_filters():
     """Matter filtering interface"""
