@@ -500,7 +500,7 @@ def extract_text_from_image(uploaded_file):
         st.error(f"Error performing OCR: {str(e)}")
         return None
 
-def perform__analysis(text, analysis_type):
+def perform_document_analysis(text, analysis_type):
     """Perform AI analysis on extracted text"""
     # Mock AI analysis - replace with actual AI service calls
     
