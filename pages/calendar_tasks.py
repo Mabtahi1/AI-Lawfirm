@@ -22,6 +22,116 @@ def auto_save_calendar_data():
     if 'court_deadlines' in st.session_state:
         DataSecurity.save_user_data('court_deadlines', st.session_state.court_deadlines)
 
+def edit_event_form(event):
+    """Display edit form for an event"""
+    st.markdown("#### ✏️ Edit Event")
+    
+    with st.form("edit_event_form"):
+        event_title = st.text_input("Event Title:", value=event.get('title', ''))
+        event_date = st.date_input("Date:", value=datetime.strptime(event.get('date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d'))
+        
+        # Parse time safely
+        time_str = event.get('time', '09:00 AM')
+        try:
+            event_time = datetime.strptime(time_str, "%I:%M %p").time()
+        except:
+            event_time = datetime.strptime("09:00 AM", "%I:%M %p").time()
+        
+        event_time = st.time_input("Time:", value=event_time)
+        event_type = st.selectbox("Type:", ["Meeting", "Deadline", "Court Date", "Other"], 
+                                 index=["Meeting", "Deadline", "Court Date", "Other"].index(event.get('type', 'Meeting')))
+        event_duration = st.selectbox("Duration:", ["15 min", "30 min", "1 hour", "2 hours", "All day"],
+                                     index=["15 min", "30 min", "1 hour", "2 hours", "All day"].index(event.get('duration', '1 hour')))
+        event_location = st.text_input("Location:", value=event.get('location', 'Office'))
+        event_attendees = st.text_input("Attendees:", value=event.get('attendees', 'Team'))
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.form_submit_button("💾 Save Changes", type="primary", use_container_width=True):
+                # Update the event
+                for e in st.session_state.events:
+                    if e.get('id') == event.get('id'):
+                        e['title'] = event_title
+                        e['date'] = event_date.strftime('%Y-%m-%d')
+                        e['time'] = event_time.strftime("%I:%M %p")
+                        e['type'] = event_type
+                        e['duration'] = event_duration
+                        e['location'] = event_location
+                        e['attendees'] = event_attendees
+                        break
+                
+                auto_save_calendar_data()
+                st.session_state.editing_event_id = None
+                st.success(f"✓ Event '{event_title}' updated successfully!")
+                st.rerun()
+        
+        with col2:
+            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                st.session_state.editing_event_id = None
+                st.rerun()
+
+def edit_task_form(task):
+    """Display edit form for a task"""
+    st.markdown("#### ✏️ Edit Task")
+    
+    # Get matters for dropdown
+    matters = st.session_state.get('matters', [])
+    if matters:
+        matter_names = [m.get('name', 'Untitled') if isinstance(m, dict) else getattr(m, 'name', 'Untitled') for m in matters]
+    else:
+        matter_names = ["General"]
+    
+    with st.form("edit_task_form"):
+        task_title = st.text_input("Task Title:", value=task.get('title', ''))
+        task_assignee = st.text_input("Assign to:", value=task.get('assignee', ''))
+        task_priority = st.selectbox("Priority:", ["High", "Medium", "Low"],
+                                    index=["High", "Medium", "Low"].index(task.get('priority', 'Medium')))
+        
+        # Parse due date safely
+        due_date_str = task.get('due_date', datetime.now().strftime('%Y-%m-%d'))
+        try:
+            task_due = st.date_input("Due Date:", value=datetime.strptime(due_date_str, '%Y-%m-%d'))
+        except:
+            task_due = st.date_input("Due Date:", value=datetime.now())
+        
+        current_matter = task.get('matter', 'General')
+        task_matter = st.selectbox("Related Matter:", matter_names,
+                                  index=matter_names.index(current_matter) if current_matter in matter_names else 0)
+        
+        task_status = st.selectbox("Status:", ["Pending", "In Progress", "Completed"],
+                                  index=["Pending", "In Progress", "Completed"].index(task.get('status', 'Pending')))
+        
+        task_progress = st.slider("Progress:", 0, 100, task.get('progress', 0))
+        task_description = st.text_area("Description:", value=task.get('description', ''))
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.form_submit_button("💾 Save Changes", type="primary", use_container_width=True):
+                # Update the task
+                for t in st.session_state.tasks:
+                    if t.get('id') == task.get('id'):
+                        t['title'] = task_title
+                        t['assignee'] = task_assignee
+                        t['priority'] = task_priority
+                        t['due_date'] = task_due.strftime('%Y-%m-%d')
+                        t['matter'] = task_matter
+                        t['status'] = task_status
+                        t['progress'] = task_progress
+                        t['description'] = task_description
+                        break
+                
+                auto_save_calendar_data()
+                st.session_state.editing_task_id = None
+                st.success(f"✓ Task '{task_title}' updated successfully!")
+                st.rerun()
+        
+        with col2:
+            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                st.session_state.editing_task_id = None
+                st.rerun()
+
 def show():
     
     # Require authentication
@@ -357,6 +467,19 @@ def show():
 def show_calendar_view():
     st.subheader("📅 Calendar Overview")
     
+    # Check if editing an event
+    if 'editing_event_id' in st.session_state and st.session_state.editing_event_id:
+        # Find the event being edited
+        event_to_edit = None
+        for event in st.session_state.events:
+            if event.get('id') == st.session_state.editing_event_id:
+                event_to_edit = event
+                break
+        
+        if event_to_edit:
+            edit_event_form(event_to_edit)
+            st.markdown("---")
+    
     col1, col2 = st.columns([3, 1])
     
     with col1:
@@ -389,7 +512,6 @@ def show_calendar_view():
                 with col_action1:
                     if st.button("✏️ Edit", key=f"edit_event_{event.get('id')}"):
                         st.session_state.editing_event_id = event.get('id')
-                        st.info(f"Editing: {event.get('title')}")
                         st.rerun()
                 
                 with col_action2:
@@ -447,6 +569,19 @@ def show_calendar_view():
 
 def show_task_management():
     st.subheader("✅ Task Management Dashboard")
+    
+    # Check if editing a task
+    if 'editing_task_id' in st.session_state and st.session_state.editing_task_id:
+        # Find the task being edited
+        task_to_edit = None
+        for task in st.session_state.tasks:
+            if task.get('id') == st.session_state.editing_task_id:
+                task_to_edit = task
+                break
+        
+        if task_to_edit:
+            edit_task_form(task_to_edit)
+            st.markdown("---")
     
     col1, col2 = st.columns([2, 1])
     
