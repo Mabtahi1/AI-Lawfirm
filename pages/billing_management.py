@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import datetime
+import time
 from services.data_security import DataSecurity
 
 def show():
@@ -11,12 +12,23 @@ def show():
     if 'billing_notification' not in st.session_state:
         st.session_state.billing_notification = None
 
-    # ADD THIS SECTION HERE:
-    # Require authentication
-    DataSecurity.require_auth("Billing Management")
+    # ✅ Check if user is authenticated
+    if 'user_data' not in st.session_state or not st.session_state.user_data:
+        st.error("⚠️ Please log in to access Billing Management")
+        st.stop()
+        return
     
     # Get user email for subscription lookup
-    user_email = DataSecurity.get_current_user_email()
+    try:
+        user_email = DataSecurity.get_current_user_email()
+        if not user_email:
+            st.error("⚠️ Session expired. Please log in again.")
+            st.stop()
+            return
+    except Exception as e:
+        st.error(f"⚠️ Authentication error: {e}")
+        st.stop()
+        return
     
     # Professional header styling
     st.markdown("""
