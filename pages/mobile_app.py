@@ -833,7 +833,7 @@ def show_push_notifications():
             with col_set1:
                 st.write(setting)
             with col_set2:
-                st.checkbox("", value=enabled, key=f"setting_{setting}")
+                st.checkbox(setting, value=enabled, key=f"setting_{setting}", label_visibility="hidden")
         
         st.markdown("#### Templates")
         
