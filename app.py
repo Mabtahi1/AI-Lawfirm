@@ -392,15 +392,15 @@ def handle_password_reset_static():
     except Exception as e:
         st.error(f"Reset error: {str(e)}")
 
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        st.error(f"Application Error: {str(e)}")
-        
-        with st.expander("🔧 Debug Info"):
-            import traceback
-            st.code(traceback.format_exc())
-        
-        if st.button("🔄 Reload"):
-            st.rerun()
+# Run the app
+try:
+    main()
+except Exception as e:
+    st.error(f"Application Error: {str(e)}")
+    
+    with st.expander("🔧 Debug Info"):
+        import traceback
+        st.code(traceback.format_exc())
+    
+    if st.button("🔄 Reload"):
+        st.rerun()
