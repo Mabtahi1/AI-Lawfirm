@@ -707,6 +707,9 @@ def show_time_tracking():
             })
         
         df = pd.DataFrame(entries_data)
+        # Convert Date column to datetime if it's not already
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.sort_values('Date', ascending=False)
         
         # Style the dataframe
