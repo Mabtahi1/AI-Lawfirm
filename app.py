@@ -126,14 +126,86 @@ def main():
     # ========== AUTHENTICATION GATE ==========
     # If user is NOT logged in, show ONLY login page (no sidebar, no other pages)
     if not st.session_state.get('logged_in', False):
-        # Apply login page styling
+        # Apply professional login page styling
         st.markdown("""
         <style>
+        /* Clean professional background */
         .stApp {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
         }
+        
+        /* Hide sidebar on login page */
         [data-testid="stSidebar"] {
             display: none;
+        }
+        
+        /* Center container with clean white card */
+        .main .block-container {
+            max-width: 500px !important;
+            margin: 0 auto !important;
+            padding: 2rem !important;
+        }
+        
+        /* Clean white card for login form */
+        [data-testid="stForm"] {
+            background: white !important;
+            padding: 3rem 2rem !important;
+            border-radius: 16px !important;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
+        }
+        
+        /* Professional input fields */
+        input {
+            border-radius: 8px !important;
+            border: 2px solid #e2e8f0 !important;
+            padding: 0.75rem !important;
+            font-size: 1rem !important;
+        }
+        
+        input:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        }
+        
+        /* Clean button styling */
+        .stButton button {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 8px !important;
+            padding: 0.75rem 2rem !important;
+            font-weight: 600 !important;
+            width: 100% !important;
+            font-size: 1rem !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .stButton button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        /* Clean typography */
+        h1 {
+            color: white !important;
+            font-weight: 700 !important;
+            text-align: center !important;
+            margin-bottom: 0.5rem !important;
+        }
+        
+        h2, h3 {
+            color: #1e293b !important;
+            font-weight: 600 !important;
+        }
+        
+        /* Remove excessive spacing */
+        .element-container {
+            margin-bottom: 1rem !important;
+        }
+        
+        /* Professional selectbox */
+        [data-baseweb="select"] {
+            border-radius: 8px !important;
         }
         </style>
         """, unsafe_allow_html=True)
