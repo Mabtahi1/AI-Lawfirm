@@ -27,18 +27,36 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Hide toolbar with refresh button */
+    /* Hide ALL Streamlit toolbar elements */
     [data-testid="stToolbar"] {
         display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
     }
     
     [data-testid="stDecoration"] {
         display: none !important;
     }
     
-    /* Hide top padding */
-    .block-container {
-        padding-top: 1rem !important;
+    [data-testid="stStatusWidget"] {
+        display: none !important;
+    }
+    
+    button[title="View fullscreen"] {
+        display: none !important;
+    }
+    
+    .stApp > header {
+        display: none !important;
+    }
+    
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
+    
+    /* Remove top spacing */
+    .main > div {
+        padding-top: 0 !important;
     }
 
     
