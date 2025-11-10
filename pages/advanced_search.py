@@ -1682,7 +1682,7 @@ def show_search_management():
         search_history = st.session_state.get('search_history', [])
         
         if search_history:
-            for search in search_history[:5]:  # Show last 5
+            for idx, search in enumerate(search_history[:5]):  # Show last 5
                 query = search.get('query', '')
                 result_count = search.get('result_count', 0)
                 timestamp = search.get('timestamp', '')
