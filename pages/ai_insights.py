@@ -355,6 +355,98 @@ def show():
     with tab6:
         show_predictive_insights()
 
+def show_upgrade_prompt(current_plan, status):
+    """Show upgrade prompt when feature is not available"""
+    
+    st.markdown("---")
+    
+    if current_plan == 'basic':
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem;
+            border-radius: 20px;
+            text-align: center;
+        ">
+            <h2>🚀 Unlock AI-Powered Insights</h2>
+            <p style="font-size: 1.2rem; margin: 1rem 0;">
+                Upgrade to Professional or Enterprise to access advanced AI features
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("### What You'll Get:")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **Professional Plan - $599/month**
+            - ✅ 50 AI insights per month
+            - ✅ 100 case comparisons per month
+            - ✅ 100 advanced searches per month
+            - ✅ Business intelligence dashboard
+            - ✅ Priority support
+            """)
+        
+        with col2:
+            st.markdown("""
+            **Enterprise Plan - $999/month**
+            - ✅ Unlimited AI insights
+            - ✅ Unlimited case comparisons
+            - ✅ Unlimited advanced searches
+            - ✅ Custom integrations
+            - ✅ 24/7 dedicated support
+            - ✅ API access
+            """)
+        
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+        with col_btn2:
+            if st.button("💳 Upgrade to Professional", type="primary", use_container_width=True):
+                st.session_state['current_page'] = 'Billing Management'
+                st.rerun()
+    
+    else:  # Professional plan, limit reached
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 20px;
+            text-align: center;
+        ">
+            <h2>⚠️ Monthly Limit Reached</h2>
+            <p style="font-size: 1.1rem;">
+                You've used all your AI insights for this month
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("### Options:")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.info("""
+            **Wait for Next Month**
+            
+            Your usage limit will reset on the 1st of next month.
+            """)
+        
+        with col2:
+            st.success("""
+            **Upgrade to Enterprise**
+            
+            Get unlimited AI features for $999/month
+            """)
+        
+        if st.button("🚀 Upgrade to Enterprise for Unlimited Access", type="primary"):
+            st.session_state['current_page'] = 'Billing Management'
+            st.rerun()
+
+
+
 def show_document_intelligence():
     """Document reading and analysis interface"""
     st.subheader("📄 Document Intelligence & Analysis")
