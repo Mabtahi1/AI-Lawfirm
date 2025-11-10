@@ -497,15 +497,15 @@ def show_client_access():
                         st.rerun()
                 with col_action2:
                     if st.button("📧 Send Invite", key=f"invite_{client.get('id')}"):
-                    # ✅ ACTUALLY SEND INVITATION
-                    invitation = send_client_invitation(
-                        client.get('email'), 
-                        client.get('name'), 
-                        client.get('access_level')
-                    )
-                    st.success(f"✅ Invitation sent to {client.get('email')}")
-                    st.code(f"Invitation Code: {invitation['invitation_code']}")
-                    st.rerun()
+                        # ✅ ACTUALLY SEND INVITATION
+                        invitation = send_client_invitation(
+                            client.get('email'), 
+                            client.get('name'), 
+                            client.get('access_level')
+                        )
+                        st.success(f"✅ Invitation sent to {client.get('email')}")
+                        st.code(f"Invitation Code: {invitation['invitation_code']}")
+                        st.rerun()
                 with col_action3:
                     if st.button("🔒 Reset Password", key=f"reset_{client.get('id')}"):
                         st.success("Password reset email sent")
