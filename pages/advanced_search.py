@@ -7,6 +7,34 @@ import json
 from services.data_security import DataSecurity
 
 def show():
+
+    if 'user_data' not in st.session_state or not st.session_state.user_data:
+        st.error("⚠️ Please log in to access Advanced Search")
+        st.stop()
+        return
+    
+    try:
+        user_email = DataSecurity.get_current_user_email()
+        if not user_email:
+            st.error("⚠️ Session expired. Please log in again.")
+            st.stop()
+            return
+    except Exception as e:
+        st.error(f"⚠️ Authentication error: {e}")
+        st.stop()
+        return
+    
+    user_data = st.session_state.get('user_data', {})
+    org_code = user_data.get('organization_code', user_email)
+    
+    try:
+        from services.subscription_manager import SubscriptionManager
+        subscription_manager = SubscriptionManager()
+        has_subscription = True
+    except Exception as e:
+        subscription_manager = None
+        has_subscription = False
+    
     # Initialize session state for search results and interactions
     if 'search_results' not in st.session_state:
         st.session_state.search_results = None
@@ -29,7 +57,22 @@ def show():
     
     if 'saved_searches' not in st.session_state:
         st.session_state.saved_searches = DataSecurity.load_user_data('saved_searches', [])
+
+    # Get subscription details
+    if has_subscription and subscription_manager:
+        subscription = subscription_manager.get_organization_subscription(org_code)
+        plan_name = subscription.get('plan', 'basic')
         
+        if plan_name == 'enterprise':
+            can_use = True
+            status = "Unlimited ✨"
+        else:
+            can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'advanced_search')
+    else:
+        plan_name = 'demo'
+        can_use = True
+        status = "Demo Mode"
+    
     # Professional header styling
     st.markdown("""
     <style>
@@ -341,6 +384,39 @@ def show():
         <p>Powerful search across all documents and matters</p>
     </div>
     """, unsafe_allow_html=True)
+
+
+    # Show usage status
+    col_status1, col_status2, col_status3 = st.columns(3)
+    
+    with col_status1:
+        st.metric("Plan", plan_name.title())
+    
+    with col_status2:
+        if has_subscription and subscription_manager:
+            if plan_name == 'professional':
+                usage = subscription_manager.get_feature_usage(org_code, 'advanced_search')
+                limit = subscription_manager.get_feature_limit(org_code, 'advanced_search')
+                st.metric("Usage This Month", f"{usage}/{limit}")
+            elif plan_name == 'enterprise':
+                st.metric("Usage", "Unlimited ✨")
+            else:
+                st.metric("Usage", "Not Available")
+        else:
+            st.metric("Usage", "Demo - Unlimited")
+    
+    with col_status3:
+        if not can_use and plan_name == 'basic':
+            st.warning("⚠️ Upgrade Required")
+        elif not can_use:
+            st.error("❌ Limit Reached")
+        else:
+            st.success("✅ Available")
+    
+    # If feature not available, show upgrade prompt
+    if not can_use:
+        show_upgrade_prompt(plan_name, status)
+        return
     
     # Search tabs
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -370,6 +446,93 @@ def show():
     with tab6:
         show_search_management()
 
+def show_upgrade_prompt(current_plan, status):
+    st.markdown("---")
+    
+    if current_plan == 'basic':
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem;
+            border-radius: 20px;
+            text-align: center;
+        ">
+            <h2>🚀 Unlock AI-Powered Advanced Search</h2>
+            <p style="font-size: 1.2rem; margin: 1rem 0;">
+                Upgrade to Professional or Enterprise to access advanced AI search
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("### What You'll Get:")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **Professional Plan - $599/month**
+            - ✅ 100 AI-powered searches per month
+            - ✅ 100 case comparisons per month
+            - ✅ 50 AI insights per month
+            - ✅ Business intelligence dashboard
+            - ✅ Priority support
+            """)
+        
+        with col2:
+            st.markdown("""
+            **Enterprise Plan - $999/month**
+            - ✅ Unlimited AI-powered searches
+            - ✅ Unlimited case comparisons
+            - ✅ Unlimited AI insights
+            - ✅ Custom integrations
+            - ✅ 24/7 dedicated support
+            - ✅ API access
+            """)
+        
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+        with col_btn2:
+            if st.button("💳 Upgrade to Professional", type="primary", use_container_width=True):
+                st.session_state['current_page'] = 'Billing Management'
+                st.rerun()
+    
+    else:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 20px;
+            text-align: center;
+        ">
+            <h2>⚠️ Monthly Limit Reached</h2>
+            <p style="font-size: 1.1rem;">
+                You've used all your AI-powered searches for this month
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("### Options:")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.info("""
+            **Wait for Next Month**
+            
+            Your usage limit will reset on the 1st of next month.
+            """)
+        
+        with col2:
+            st.success("""
+            **Upgrade to Enterprise**
+            
+            Get unlimited AI features for $999/month
+            """)
+        
+        if st.button("🚀 Upgrade to Enterprise for Unlimited Access", type="primary"):
+            st.session_state['current_page'] = 'Billing Management'
+            st.rerun()
 
 def get_universal_search_results(query):
     """Search across actual documents in session state - SECURE"""
@@ -961,7 +1124,7 @@ def show_data_analytics():
             with col_acc2:
                 st.write(f"{access_count} views")
 
-def show_ai_powered_search():
+def show_ai_powered_search(subscription_manager, org_code, plan_name, has_subscription):
     st.subheader("🤖 AI-Powered Intelligent Search")
     
     col1, col2 = st.columns([3, 1])
@@ -984,7 +1147,29 @@ def show_ai_powered_search():
         search_mode = st.radio("Search Mode:", ["Standard AI", "Deep Analysis", "Comparative Search", "Predictive Search"])
         
         if st.button("🤖 AI Search", type="primary"):
-            st.session_state.ai_results = get_ai_search_results(ai_query)
+            with st.spinner("🤖 AI is searching... This may take 30-60 seconds..."):
+                st.session_state.ai_results = get_ai_search_results(ai_query)
+                
+                # Increment usage
+                if has_subscription and subscription_manager and plan_name != 'enterprise':
+                    subscription_manager.increment_feature_usage(org_code, 'advanced_search')
+            
+            st.success("✅ Search complete!")
+            
+            # Show updated usage
+            if has_subscription and subscription_manager:
+                if plan_name == 'professional':
+                    usage = subscription_manager.get_feature_usage(org_code, 'advanced_search')
+                    limit = subscription_manager.get_feature_limit(org_code, 'advanced_search')
+                    remaining = limit - usage
+                    if remaining > 0:
+                        st.info(f"📊 You have {remaining} AI searches remaining this month")
+                    else:
+                        st.warning("⚠️ You've reached your monthly limit")
+                elif plan_name == 'enterprise':
+                    st.success("✨ Unlimited AI searches available")
+            else:
+                st.success("✨ Demo mode - Unlimited AI searches")
         
         # Display notification
         if st.session_state.notification:
