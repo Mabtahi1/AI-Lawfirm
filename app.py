@@ -139,36 +139,110 @@ def main():
             display: none;
         }
         
-        /* White text */
-        label, p, span, div {
+        /* Center container */
+        .main .block-container {
+            max-width: 500px !important;
+            margin: 0 auto !important;
+            padding: 3rem 2rem !important;
+        }
+        
+        /* Glass-morphism card for form */
+        [data-testid="stForm"] {
+            background: rgba(139, 92, 246, 0.25) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            border-radius: 20px !important;
+            padding: 2.5rem 2rem !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+        }
+        
+        /* All text white */
+        label, p, span, div, .stMarkdown {
             color: white !important;
         }
         
         /* Glass effect inputs */
         input {
-            background: rgba(255, 255, 255, 0.2) !important;
+            background: rgba(255, 255, 255, 0.18) !important;
             border: 1px solid rgba(255, 255, 255, 0.3) !important;
             border-radius: 12px !important;
+            padding: 0.875rem 1rem !important;
             color: white !important;
+            font-size: 0.95rem !important;
         }
         
-        /* Cyan button */
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.6) !important;
+        }
+        
+        input:focus {
+            background: rgba(255, 255, 255, 0.25) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
+        }
+        
+        /* Cyan/Teal button like Lucy */
         .stButton button {
             background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%) !important;
             color: #0f172a !important;
+            border: none !important;
             border-radius: 12px !important;
+            padding: 0.875rem 2rem !important;
             font-weight: 600 !important;
+            width: 100% !important;
+            font-size: 1rem !important;
+            transition: all 0.3s ease !important;
         }
         
         .stButton button:hover {
             transform: translateY(-2px) !important;
             box-shadow: 0 10px 30px rgba(6, 182, 212, 0.4) !important;
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%) !important;
         }
         
-        /* White titles */
+        /* Titles - white and centered */
         h1, h2, h3 {
             color: white !important;
             text-align: center !important;
+            font-weight: 700 !important;
+        }
+        
+        h1 {
+            font-size: 2rem !important;
+            margin-bottom: 2rem !important;
+        }
+        
+        /* Selectbox glass effect */
+        [data-baseweb="select"] {
+            background: rgba(255, 255, 255, 0.18) !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            border-radius: 12px !important;
+        }
+        
+        [data-baseweb="select"] > div {
+            background: transparent !important;
+            color: white !important;
+        }
+        
+        /* Checkbox styling */
+        [data-testid="stCheckbox"] {
+            color: white !important;
+        }
+        
+        /* Expander (forgot password) */
+        [data-testid="stExpander"] {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 12px !important;
+        }
+        
+        /* Success/Error messages glass effect */
+        .stSuccess, .stError, .stInfo {
+            background: rgba(255, 255, 255, 0.15) !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            border-radius: 12px !important;
+            backdrop-filter: blur(10px) !important;
         }
         </style>
         """, unsafe_allow_html=True)
