@@ -291,6 +291,31 @@ def main():
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
             border: 1px solid rgba(255, 255, 255, 0.2) !important;
         }
+
+        /* Dropdown/Selectbox inside forms - DARK TEXT */
+        [data-testid="stForm"] [data-baseweb="select"],
+        [data-testid="stForm"] .stSelectbox {
+            background: white !important;
+        }
+        
+        [data-testid="stForm"] [data-baseweb="select"] *,
+        [data-testid="stForm"] .stSelectbox * {
+            color: #1e293b !important;
+        }
+        
+        /* Dropdown menu when opened */
+        [data-testid="stForm"] [role="listbox"],
+        [data-testid="stForm"] [role="option"],
+        [data-testid="stForm"] ul[role="listbox"] {
+            background: white !important;
+        }
+        
+        [data-testid="stForm"] [role="listbox"] *,
+        [data-testid="stForm"] [role="option"] *,
+        [data-testid="stForm"] ul[role="listbox"] * {
+            color: #1e293b !important;
+        }
+
         
         /* Form labels and text should be white */
         [data-testid="stForm"] label,
