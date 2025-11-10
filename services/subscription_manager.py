@@ -329,143 +329,282 @@ class EnhancedAuthService:
         return True, "Account created successfully"
     
     def show_login(self):
-        """Show login/signup page with Lucy-style split-screen layout"""
+        """Beautiful unified login page"""
         
-        # Initialize session state for form toggle
+        # Initialize session state
         if 'show_signup_form' not in st.session_state:
             st.session_state.show_signup_form = False
-        
         if 'show_payment_form' not in st.session_state:
             st.session_state.show_payment_form = False
     
-        # Two-column layout: Left (info) + Right (form)
-        col_left, col_right = st.columns([1, 1])
+        # Single centered container
+        st.markdown("""
+        <div style="
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        ">
+        </div>
+        """, unsafe_allow_html=True)
         
-        # ============= LEFT SIDE: Branding & Info =============
-        with col_left:
+        # Create columns for split layout
+        col1, col2 = st.columns([1.2, 1], gap="large")
+        
+        # ============= LEFT SIDE: Beautiful Branding =============
+        with col1:
             st.markdown("""
-            <div style="padding: 3rem 2rem; height: 100vh; display: flex; flex-direction: column; justify-content: center;">
-                <!-- Logo and Title -->
-                <div style="margin-bottom: 3rem;">
-                    <div style="font-size: 3.5rem; margin-bottom: 1rem;">⚖️</div>
-                    <h1 style="color: white; font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem;">
-                        LegalDoc Pro
-                    </h1>
-                    <p style="color: rgba(255, 255, 255, 0.8); font-size: 1.1rem;">
-                        Innovation Starts Here
-                    </p>
-                </div>
-                
-                <!-- Description -->
-                <div style="margin-bottom: 3rem;">
-                    <h2 style="color: white; font-size: 1.8rem; font-weight: 600; margin-bottom: 1.5rem;">
-                        You will be using one of<br/>
-                        LegalDoc Pro's core applications:<br/>
-                        <span style="color: #22d3ee;">Enterprise Legal Management™</span>
-                    </h2>
-                </div>
-                
-                <!-- 3D Decorative Element (CSS-based) -->
-                <div style="position: relative; width: 250px; height: 250px; margin: 2rem 0;">
+            <div style="
+                padding: 4rem 3rem;
+                height: 90vh;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            ">
+                <!-- Animated 3D Logo -->
+                <div style="
+                    width: 300px;
+                    height: 300px;
+                    position: relative;
+                    margin: 0 auto 3rem auto;
+                ">
+                    <!-- Layer 1 -->
                     <div style="
                         position: absolute;
-                        width: 200px;
-                        height: 80px;
-                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(6, 182, 212, 0.3) 100%);
+                        width: 250px;
+                        height: 100px;
+                        background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
                         border-radius: 50%;
                         top: 0;
-                        left: 0;
-                        transform: rotate(-15deg);
-                        backdrop-filter: blur(10px);
-                        box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+                        left: 25px;
+                        transform: rotate(-20deg);
+                        opacity: 0.7;
+                        filter: blur(1px);
+                        box-shadow: 0 20px 60px rgba(167, 139, 250, 0.4);
+                        animation: float 6s ease-in-out infinite;
                     "></div>
+                    
+                    <!-- Layer 2 -->
                     <div style="
                         position: absolute;
-                        width: 200px;
-                        height: 80px;
-                        background: linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(139, 92, 246, 0.3) 100%);
+                        width: 250px;
+                        height: 100px;
+                        background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
                         border-radius: 50%;
-                        top: 60px;
-                        left: 30px;
+                        top: 80px;
+                        left: 50px;
                         transform: rotate(15deg);
-                        backdrop-filter: blur(10px);
-                        box-shadow: 0 10px 30px rgba(6, 182, 212, 0.3);
+                        opacity: 0.8;
+                        filter: blur(1px);
+                        box-shadow: 0 20px 60px rgba(6, 182, 212, 0.4);
+                        animation: float 6s ease-in-out infinite 2s;
                     "></div>
+                    
+                    <!-- Layer 3 -->
                     <div style="
                         position: absolute;
-                        width: 200px;
-                        height: 80px;
-                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.5) 0%, rgba(6, 182, 212, 0.4) 100%);
+                        width: 250px;
+                        height: 100px;
+                        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
                         border-radius: 50%;
-                        top: 120px;
-                        left: 0;
-                        transform: rotate(-10deg);
-                        backdrop-filter: blur(10px);
-                        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+                        top: 160px;
+                        left: 25px;
+                        transform: rotate(-15deg);
+                        opacity: 0.9;
+                        box-shadow: 0 20px 60px rgba(139, 92, 246, 0.5);
+                        animation: float 6s ease-in-out infinite 4s;
                     "></div>
                 </div>
                 
-                <!-- Feature Buttons -->
-                <div style="margin-top: 2rem;">
-                    <button style="
-                        background: rgba(255, 255, 255, 0.15);
-                        border: 1px solid rgba(255, 255, 255, 0.3);
-                        color: white;
-                        padding: 0.75rem 1.5rem;
-                        border-radius: 12px;
-                        margin-right: 1rem;
-                        margin-bottom: 1rem;
-                        font-weight: 500;
-                        cursor: pointer;
-                        backdrop-filter: blur(10px);
-                    ">What to Expect?</button>
-                    <button style="
-                        background: rgba(255, 255, 255, 0.15);
-                        border: 1px solid rgba(255, 255, 255, 0.3);
-                        color: white;
-                        padding: 0.75rem 1.5rem;
-                        border-radius: 12px;
-                        font-weight: 500;
-                        cursor: pointer;
-                        backdrop-filter: blur(10px);
-                    ">Other Features</button>
+                <style>
+                @keyframes float {
+                    0%, 100% { transform: translateY(0) rotate(var(--rotate)); }
+                    50% { transform: translateY(-20px) rotate(var(--rotate)); }
+                }
+                </style>
+                
+                <!-- Title -->
+                <h1 style="
+                    color: white;
+                    font-size: 3rem;
+                    font-weight: 800;
+                    text-align: center;
+                    margin-bottom: 1rem;
+                    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                ">⚖️ LegalDoc Pro</h1>
+                
+                <p style="
+                    color: rgba(255, 255, 255, 0.9);
+                    font-size: 1.3rem;
+                    text-align: center;
+                    margin-bottom: 3rem;
+                    font-weight: 300;
+                ">Enterprise Legal Management Platform</p>
+                
+                <!-- Features -->
+                <div style="
+                    background: rgba(255, 255, 255, 0.1);
+                    backdrop-filter: blur(20px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 20px;
+                    padding: 2rem;
+                    margin-top: 2rem;
+                ">
+                    <h3 style="color: white; margin-bottom: 1.5rem; font-weight: 600;">✨ What's Included</h3>
+                    <ul style="
+                        color: rgba(255, 255, 255, 0.9);
+                        font-size: 1.05rem;
+                        line-height: 2;
+                        list-style: none;
+                        padding: 0;
+                    ">
+                        <li>🤖 AI-Powered Document Analysis</li>
+                        <li>📊 Real-time Business Intelligence</li>
+                        <li>⚖️ Smart Case Comparison</li>
+                        <li>🔍 Advanced Legal Search</li>
+                        <li>💼 Complete Matter Management</li>
+                    </ul>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-    
-        # ============= RIGHT SIDE: Form =============
-        with col_right:
-            st.markdown('<div style="padding: 2rem;">', unsafe_allow_html=True)
+        
+        # ============= RIGHT SIDE: Beautiful Form =============
+        with col2:
+            st.markdown("""
+            <div style="
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+                border-radius: 24px;
+                padding: 3rem 2.5rem;
+                box-shadow: 0 20px 80px rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.5);
+                margin-top: 2rem;
+            ">
+            """, unsafe_allow_html=True)
             
-            # ============= PAYMENT FORM (Step 2) =============
-            if st.session_state.show_payment_form:
+            # ============= LOGIN FORM =============
+            if not st.session_state.show_signup_form and not st.session_state.show_payment_form:
+                st.markdown('<h2 style="color: #1e293b; text-align: center; margin-bottom: 2rem; font-weight: 700;">Welcome Back!</h2>', unsafe_allow_html=True)
+                
+                with st.expander("📝 Demo Accounts"):
+                    st.markdown("""
+                    **Starter:** basic@demo.com / demo123  
+                    **Professional:** pro@demo.com / demo123  
+                    **Enterprise:** enterprise@demo.com / demo123
+                    """)
+                
+                with st.form("login_form"):
+                    st.text_input("Email Address", placeholder="you@company.com", key="login_email")
+                    st.text_input("Password", type="password", key="login_pwd")
+                    
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.checkbox("Remember me")
+                    with col_b:
+                        st.markdown('<p style="text-align: right; color: #64748b; font-size: 0.9rem; cursor: pointer;">Forgot password?</p>', unsafe_allow_html=True)
+                    
+                    submitted = st.form_submit_button("Sign In", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        email = st.session_state.get('login_email', '')
+                        password = st.session_state.get('login_pwd', '')
+                        
+                        if not email or not password:
+                            st.error("⚠️ Please enter email and password")
+                        else:
+                            success, message = self.login(email, password)
+                            if success:
+                                st.success("✅ Welcome back!")
+                                import time
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {message}")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<p style="text-align: center; color: #64748b;">Don\'t have an account?</p>', unsafe_allow_html=True)
+                if st.button("Create Account", use_container_width=True):
+                    st.session_state.show_signup_form = True
+                    st.rerun()
+            
+            # ============= SIGNUP FORM =============
+            elif st.session_state.show_signup_form and not st.session_state.show_payment_form:
+                st.markdown('<h2 style="color: #1e293b; text-align: center; margin-bottom: 1.5rem; font-weight: 700;">Get Started</h2>', unsafe_allow_html=True)
+                
+                with st.form("signup_form"):
+                    st.markdown("**Organization Details**")
+                    org_name = st.text_input("Law Firm Name", placeholder="Smith & Associates")
+                    org_code = st.text_input("Organization Code", placeholder="smithlaw")
+                    
+                    st.markdown("**Your Details**")
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        first_name = st.text_input("First Name")
+                    with col_b:
+                        last_name = st.text_input("Last Name")
+                    
+                    email = st.text_input("Work Email", placeholder="john@smithlaw.com")
+                    password = st.text_input("Password", type="password", placeholder="Min. 8 characters")
+                    confirm_password = st.text_input("Confirm Password", type="password")
+                    
+                    st.markdown("**Choose Plan**")
+                    plan_option = st.selectbox("", [
+                        "Starter - $299/mo",
+                        "Professional - $599/mo",
+                        "Enterprise - $999/mo"
+                    ])
+                    
+                    agree = st.checkbox("I agree to Terms & authorize monthly billing")
+                    
+                    submitted = st.form_submit_button("Continue to Payment →", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        errors = []
+                        if not all([org_name, org_code, first_name, last_name, email, password]):
+                            errors.append("All fields required")
+                        if password and len(password) < 8:
+                            errors.append("Password must be 8+ characters")
+                        if password != confirm_password:
+                            errors.append("Passwords don't match")
+                        if not agree:
+                            errors.append("Must agree to terms")
+                        
+                        if errors:
+                            for error in errors:
+                                st.error(f"⚠️ {error}")
+                        else:
+                            plan_name = "basic" if "Starter" in plan_option else ("professional" if "Professional" in plan_option else "enterprise")
+                            st.session_state.temp_signup_data = {
+                                'email': email,
+                                'password': password,
+                                'name': f"{first_name} {last_name}",
+                                'organization_name': org_name,
+                                'organization_code': org_code,
+                                'plan': plan_name
+                            }
+                            st.session_state.show_payment_form = True
+                            st.rerun()
+                
+                if st.button("← Back to Login", use_container_width=True):
+                    st.session_state.show_signup_form = False
+                    st.rerun()
+            
+            # ============= PAYMENT FORM =============
+            else:
                 from services.payment_service import PaymentService
                 
-                st.markdown("### 💳 Complete Your Payment")
+                st.markdown('<h2 style="color: #1e293b; text-align: center; margin-bottom: 1.5rem; font-weight: 700;">Complete Payment</h2>', unsafe_allow_html=True)
                 
-                # Back button
-                if st.button("← Back to Signup", use_container_width=True):
-                    st.session_state.show_payment_form = False
-                    st.rerun()
-                
-                st.markdown("---")
-                
-                # Show what they're signing up for
                 signup_data = st.session_state.get('temp_signup_data', {})
                 plan_name = signup_data.get('plan', 'basic')
                 plan_details = SUBSCRIPTION_PLANS.get(plan_name, {})
                 
-                st.info(f"""
-                **Organization:** {signup_data.get('organization_name')}  
-                **Email:** {signup_data.get('email')}  
-                **Plan:** {plan_details.get('name', 'Basic')} - ${plan_details.get('price', 0)}/month
-                """)
+                st.info(f"""**{signup_data.get('organization_name')}**  
+                {signup_data.get('email')}  
+                {plan_details.get('name')} - ${plan_details.get('price')}/month""")
                 
-                # Payment form
                 payment_service = PaymentService()
                 
                 def complete_registration():
-                    """Callback after successful payment"""
                     data = st.session_state.temp_signup_data
                     success, message = self.register(
                         email=data['email'],
@@ -475,161 +614,21 @@ class EnhancedAuthService:
                         organization_code=data['organization_code'],
                         plan=data['plan']
                     )
-                    
                     if success:
                         st.session_state.show_payment_form = False
                         st.session_state.show_signup_form = False
-                        st.session_state.temp_signup_data = None
-                        st.success("✅ Account created successfully! Please login.")
+                        st.success("✅ Account created!")
                         import time
                         time.sleep(2)
                         st.rerun()
-                    else:
-                        st.error(f"❌ Error creating account: {message}")
                 
-                # Show payment form
-                payment_success = payment_service.show_payment_form(
-                    plan_name=plan_name,
-                    on_success_callback=complete_registration
-                )
-            
-            # ============= LOGIN FORM =============
-            elif not st.session_state.show_signup_form:
-                st.markdown('<h2 style="color: white; text-align: center; margin-bottom: 2rem;">Log In to LegalDoc Pro™</h2>', unsafe_allow_html=True)
+                payment_service.show_payment_form(plan_name=plan_name, on_success_callback=complete_registration)
                 
-                # Demo accounts
-                with st.expander("📝 Demo Accounts"):
-                    st.markdown("""
-                    **Starter:** basic@demo.com / demo123  
-                    **Professional:** pro@demo.com / demo123  
-                    **Enterprise:** enterprise@demo.com / demo123
-                    """)
-                
-                with st.form("login_form"):
-                    st.text_input("Your Email", placeholder="your@email.com", key="login_email")
-                    st.text_input("Your Password", type="password", key="login_password")
-                    
-                    col_check, col_forgot = st.columns(2)
-                    with col_check:
-                        st.checkbox("Remember")
-                    with col_forgot:
-                        st.markdown('<p style="text-align: right; color: rgba(255,255,255,0.8);">Forgotten?</p>', unsafe_allow_html=True)
-                    
-                    submitted = st.form_submit_button("Log In", use_container_width=True)
-                    
-                    if submitted:
-                        email = st.session_state.get('login_email', '')
-                        password = st.session_state.get('login_password', '')
-                        
-                        if not email or not password:
-                            st.error("⚠️ Please enter email and password")
-                        else:
-                            success, message = self.login(email, password)
-                            if success:
-                                st.success("✅ Login successful!")
-                                import time
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error(f"❌ {message}")
-                
-                # Signup button
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown('<p style="text-align: center; color: white;">Don\'t have an account?</p>', unsafe_allow_html=True)
-                if st.button("Sign Up", use_container_width=True):
-                    st.session_state.show_signup_form = True
-                    st.rerun()
-    
-            # ============= SIGNUP FORM (Step 1) =============
-            else:
-                st.markdown('<h2 style="color: white; text-align: center; margin-bottom: 2rem;">Create Your Account</h2>', unsafe_allow_html=True)
-                st.info("💳 Payment required to activate your account")
-                
-                with st.form("signup_form"):
-                    st.markdown("#### 🏢 Organization")
-                    org_name = st.text_input("Firm Name*", placeholder="Smith Law Firm")
-                    org_code = st.text_input("Organization Code*", placeholder="smithlaw")
-                    
-                    st.markdown("#### 👤 Your Information")
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        first_name = st.text_input("First Name*")
-                    with col_b:
-                        last_name = st.text_input("Last Name*")
-                    
-                    email = st.text_input("📧 Email*", placeholder="john@smithlaw.com")
-                    
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        password = st.text_input("🔒 Password*", type="password", placeholder="Min. 8 chars")
-                    with col_b:
-                        confirm_password = st.text_input("🔒 Confirm*", type="password")
-                    
-                    st.markdown("#### 💳 Choose Your Plan")
-                    
-                    # Plan selection with pricing
-                    plan_option = st.radio(
-                        "Select Plan",
-                        [
-                            "Starter - $299/month - Basic features only",
-                            "Professional - $599/month - AI features (limited usage)",
-                            "Enterprise - $999/month - Unlimited AI features"
-                        ],
-                        help="Choose the plan that fits your needs"
-                    )
-                    
-                    agree = st.checkbox("I agree to Terms of Service and authorize monthly payments")
-                    
-                    submitted = st.form_submit_button("Continue to Payment →", use_container_width=True, type="primary")
-                    
-                    if submitted:
-                        errors = []
-                        
-                        # Validation
-                        if not all([org_name, org_code, first_name, last_name, email, password]):
-                            errors.append("All fields required")
-                        if password and len(password) < 8:
-                            errors.append("Password must be 8+ characters")
-                        if password != confirm_password:
-                            errors.append("Passwords don't match")
-                        if not agree:
-                            errors.append("Must agree to Terms and authorize payments")
-                        if org_code and (' ' in org_code or org_code != org_code.lower()):
-                            errors.append("Org code: lowercase, no spaces")
-                        
-                        if errors:
-                            for error in errors:
-                                st.error(f"⚠️ {error}")
-                        else:
-                            # Determine plan
-                            if "Starter" in plan_option:
-                                plan_name = "basic"
-                            elif "Professional" in plan_option:
-                                plan_name = "professional"
-                            else:
-                                plan_name = "enterprise"
-                            
-                            # Store signup data temporarily
-                            st.session_state.temp_signup_data = {
-                                'email': email,
-                                'password': password,
-                                'name': f"{first_name} {last_name}",
-                                'organization_name': org_name,
-                                'organization_code': org_code,
-                                'plan': plan_name
-                            }
-                            
-                            # Move to payment form
-                            st.session_state.show_payment_form = True
-                            st.rerun()
-                
-                # Back to login button
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🔑 Already have an account? Login", use_container_width=True):
-                    st.session_state.show_signup_form = False
+                if st.button("← Back", use_container_width=True):
+                    st.session_state.show_payment_form = False
                     st.rerun()
             
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
 
     def _handle_forgot_password(self, email):
