@@ -329,7 +329,7 @@ class EnhancedAuthService:
         return True, "Account created successfully"
     
     def show_login(self):
-        """Beautiful unified login page"""
+        """Beautiful professional login page"""
         
         # Initialize session state
         if 'show_signup_form' not in st.session_state:
@@ -337,153 +337,119 @@ class EnhancedAuthService:
         if 'show_payment_form' not in st.session_state:
             st.session_state.show_payment_form = False
     
-        # Single centered container
-        st.markdown("""
-        <div style="
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        ">
-        </div>
-        """, unsafe_allow_html=True)
-        
         # Create columns for split layout
-        col1, col2 = st.columns([1.2, 1], gap="large")
+        col1, col2 = st.columns([1, 1], gap="large")
         
-        # ============= LEFT SIDE: Beautiful Branding =============
+        # ============= LEFT SIDE: Logo & Branding =============
         with col1:
             st.markdown("""
-            <div style="
-                padding: 4rem 3rem;
-                height: 90vh;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            ">
-                <!-- Animated 3D Logo -->
+            <div style="padding: 2rem; text-align: center;">
+                <!-- 3D Logo at Top -->
                 <div style="
-                    width: 300px;
-                    height: 300px;
+                    width: 280px;
+                    height: 280px;
                     position: relative;
-                    margin: 0 auto 3rem auto;
+                    margin: 1rem auto 2rem auto;
                 ">
-                    <!-- Layer 1 -->
+                    <!-- Floating layer 1 -->
                     <div style="
                         position: absolute;
-                        width: 250px;
-                        height: 100px;
-                        background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
+                        width: 220px;
+                        height: 90px;
+                        background: linear-gradient(135deg, rgba(236, 72, 153, 0.6) 0%, rgba(168, 85, 247, 0.5) 100%);
                         border-radius: 50%;
-                        top: 0;
-                        left: 25px;
-                        transform: rotate(-20deg);
-                        opacity: 0.7;
-                        filter: blur(1px);
-                        box-shadow: 0 20px 60px rgba(167, 139, 250, 0.4);
-                        animation: float 6s ease-in-out infinite;
+                        top: 10px;
+                        left: 30px;
+                        transform: rotate(-18deg);
+                        filter: blur(2px);
+                        box-shadow: 0 15px 40px rgba(236, 72, 153, 0.3);
                     "></div>
                     
-                    <!-- Layer 2 -->
+                    <!-- Floating layer 2 -->
                     <div style="
                         position: absolute;
-                        width: 250px;
-                        height: 100px;
-                        background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+                        width: 220px;
+                        height: 90px;
+                        background: linear-gradient(135deg, rgba(59, 130, 246, 0.7) 0%, rgba(6, 182, 212, 0.6) 100%);
                         border-radius: 50%;
-                        top: 80px;
+                        top: 90px;
                         left: 50px;
-                        transform: rotate(15deg);
-                        opacity: 0.8;
-                        filter: blur(1px);
-                        box-shadow: 0 20px 60px rgba(6, 182, 212, 0.4);
-                        animation: float 6s ease-in-out infinite 2s;
+                        transform: rotate(12deg);
+                        filter: blur(2px);
+                        box-shadow: 0 15px 40px rgba(59, 130, 246, 0.4);
                     "></div>
                     
-                    <!-- Layer 3 -->
+                    <!-- Floating layer 3 -->
                     <div style="
                         position: absolute;
-                        width: 250px;
-                        height: 100px;
-                        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+                        width: 220px;
+                        height: 90px;
+                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(99, 102, 241, 0.7) 100%);
                         border-radius: 50%;
-                        top: 160px;
-                        left: 25px;
-                        transform: rotate(-15deg);
-                        opacity: 0.9;
-                        box-shadow: 0 20px 60px rgba(139, 92, 246, 0.5);
-                        animation: float 6s ease-in-out infinite 4s;
+                        top: 170px;
+                        left: 30px;
+                        transform: rotate(-12deg);
+                        box-shadow: 0 15px 40px rgba(139, 92, 246, 0.5);
                     "></div>
                 </div>
                 
-                <style>
-                @keyframes float {
-                    0%, 100% { transform: translateY(0) rotate(var(--rotate)); }
-                    50% { transform: translateY(-20px) rotate(var(--rotate)); }
-                }
-                </style>
-                
-                <!-- Title -->
+                <!-- Company Name -->
                 <h1 style="
                     color: white;
-                    font-size: 3rem;
+                    font-size: 2.8rem;
                     font-weight: 800;
-                    text-align: center;
-                    margin-bottom: 1rem;
-                    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-                ">⚖️ LegalDoc Pro</h1>
+                    margin-bottom: 0.5rem;
+                    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+                ">⚖️ Prolexis Analytics</h1>
                 
                 <p style="
-                    color: rgba(255, 255, 255, 0.9);
-                    font-size: 1.3rem;
-                    text-align: center;
-                    margin-bottom: 3rem;
+                    color: rgba(255, 255, 255, 0.85);
+                    font-size: 1.2rem;
                     font-weight: 300;
-                ">Enterprise Legal Management Platform</p>
+                    margin-bottom: 3rem;
+                ">Legal Intelligence Platform</p>
                 
-                <!-- Features -->
+                <!-- Feature Highlights -->
                 <div style="
-                    background: rgba(255, 255, 255, 0.1);
-                    backdrop-filter: blur(20px);
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                    border-radius: 20px;
+                    text-align: left;
+                    max-width: 400px;
+                    margin: 0 auto;
                     padding: 2rem;
-                    margin-top: 2rem;
+                    background: rgba(255, 255, 255, 0.06);
+                    backdrop-filter: blur(10px);
+                    border-radius: 16px;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
                 ">
-                    <h3 style="color: white; margin-bottom: 1.5rem; font-weight: 600;">✨ What's Included</h3>
+                    <h3 style="
+                        color: white;
+                        font-size: 1.3rem;
+                        margin-bottom: 1.5rem;
+                        font-weight: 600;
+                    ">✨ Platform Features</h3>
                     <ul style="
                         color: rgba(255, 255, 255, 0.9);
-                        font-size: 1.05rem;
+                        font-size: 1rem;
                         line-height: 2;
                         list-style: none;
                         padding: 0;
                     ">
-                        <li>🤖 AI-Powered Document Analysis</li>
-                        <li>📊 Real-time Business Intelligence</li>
-                        <li>⚖️ Smart Case Comparison</li>
-                        <li>🔍 Advanced Legal Search</li>
-                        <li>💼 Complete Matter Management</li>
+                        <li>🤖 AI Document Analysis</li>
+                        <li>📊 Business Intelligence</li>
+                        <li>⚖️ Case Comparison</li>
+                        <li>🔍 Advanced Search</li>
+                        <li>💼 Matter Management</li>
                     </ul>
                 </div>
             </div>
             """, unsafe_allow_html=True)
         
-        # ============= RIGHT SIDE: Beautiful Form =============
+        # ============= RIGHT SIDE: Clean Form =============
         with col2:
-            st.markdown("""
-            <div style="
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(20px);
-                border-radius: 24px;
-                padding: 3rem 2.5rem;
-                box-shadow: 0 20px 80px rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.5);
-                margin-top: 2rem;
-            ">
-            """, unsafe_allow_html=True)
+            st.markdown('<div style="padding: 2rem 1rem;">', unsafe_allow_html=True)
             
             # ============= LOGIN FORM =============
             if not st.session_state.show_signup_form and not st.session_state.show_payment_form:
-                st.markdown('<h2 style="color: #1e293b; text-align: center; margin-bottom: 2rem; font-weight: 700;">Welcome Back!</h2>', unsafe_allow_html=True)
+                st.markdown('<h2 style="color: white; text-align: center; margin-bottom: 2rem; font-weight: 700; font-size: 2rem;">Welcome Back!</h2>', unsafe_allow_html=True)
                 
                 with st.expander("📝 Demo Accounts"):
                     st.markdown("""
@@ -493,14 +459,17 @@ class EnhancedAuthService:
                     """)
                 
                 with st.form("login_form"):
-                    st.text_input("Email Address", placeholder="you@company.com", key="login_email")
-                    st.text_input("Password", type="password", key="login_pwd")
+                    st.markdown("**Email Address**")
+                    email_input = st.text_input("Email", placeholder="you@company.com", label_visibility="collapsed", key="login_email")
+                    
+                    st.markdown("**Password**")
+                    pwd_input = st.text_input("Password", type="password", label_visibility="collapsed", key="login_pwd")
                     
                     col_a, col_b = st.columns(2)
                     with col_a:
                         st.checkbox("Remember me")
                     with col_b:
-                        st.markdown('<p style="text-align: right; color: #64748b; font-size: 0.9rem; cursor: pointer;">Forgot password?</p>', unsafe_allow_html=True)
+                        st.markdown('<p style="text-align: right; color: rgba(255, 255, 255, 0.7); font-size: 0.9rem; margin-top: 0.3rem;">Forgot password?</p>', unsafe_allow_html=True)
                     
                     submitted = st.form_submit_button("Sign In", use_container_width=True, type="primary")
                     
@@ -521,33 +490,33 @@ class EnhancedAuthService:
                                 st.error(f"❌ {message}")
                 
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown('<p style="text-align: center; color: #64748b;">Don\'t have an account?</p>', unsafe_allow_html=True)
+                st.markdown('<p style="text-align: center; color: rgba(255, 255, 255, 0.8);">Don\'t have an account?</p>', unsafe_allow_html=True)
                 if st.button("Create Account", use_container_width=True):
                     st.session_state.show_signup_form = True
                     st.rerun()
             
             # ============= SIGNUP FORM =============
             elif st.session_state.show_signup_form and not st.session_state.show_payment_form:
-                st.markdown('<h2 style="color: #1e293b; text-align: center; margin-bottom: 1.5rem; font-weight: 700;">Get Started</h2>', unsafe_allow_html=True)
+                st.markdown('<h2 style="color: white; text-align: center; margin-bottom: 1.5rem; font-weight: 700; font-size: 2rem;">Get Started</h2>', unsafe_allow_html=True)
                 
                 with st.form("signup_form"):
-                    st.markdown("**Organization Details**")
-                    org_name = st.text_input("Law Firm Name", placeholder="Smith & Associates")
+                    st.markdown("**Organization**")
+                    org_name = st.text_input("Firm Name", placeholder="Smith & Associates")
                     org_code = st.text_input("Organization Code", placeholder="smithlaw")
                     
-                    st.markdown("**Your Details**")
+                    st.markdown("**Your Information**")
                     col_a, col_b = st.columns(2)
                     with col_a:
                         first_name = st.text_input("First Name")
                     with col_b:
                         last_name = st.text_input("Last Name")
                     
-                    email = st.text_input("Work Email", placeholder="john@smithlaw.com")
+                    email = st.text_input("Email", placeholder="john@smithlaw.com")
                     password = st.text_input("Password", type="password", placeholder="Min. 8 characters")
                     confirm_password = st.text_input("Confirm Password", type="password")
                     
-                    st.markdown("**Choose Plan**")
-                    plan_option = st.selectbox("", [
+                    st.markdown("**Plan**")
+                    plan_option = st.selectbox("Choose Plan", [
                         "Starter - $299/mo",
                         "Professional - $599/mo",
                         "Enterprise - $999/mo"
@@ -592,7 +561,7 @@ class EnhancedAuthService:
             else:
                 from services.payment_service import PaymentService
                 
-                st.markdown('<h2 style="color: #1e293b; text-align: center; margin-bottom: 1.5rem; font-weight: 700;">Complete Payment</h2>', unsafe_allow_html=True)
+                st.markdown('<h2 style="color: white; text-align: center; margin-bottom: 1.5rem; font-weight: 700;">Complete Payment</h2>', unsafe_allow_html=True)
                 
                 signup_data = st.session_state.get('temp_signup_data', {})
                 plan_name = signup_data.get('plan', 'basic')
@@ -628,7 +597,7 @@ class EnhancedAuthService:
                     st.session_state.show_payment_form = False
                     st.rerun()
             
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
 
     def _handle_forgot_password(self, email):
