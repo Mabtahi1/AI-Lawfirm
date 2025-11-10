@@ -126,12 +126,12 @@ def main():
     # ========== AUTHENTICATION GATE ==========
     # If user is NOT logged in, show ONLY login page (no sidebar, no other pages)
     if not st.session_state.get('logged_in', False):
-        # Apply Lucy-style professional login page styling
+        # Apply professional clean login page styling
         st.markdown("""
         <style>
-        /* Purple gradient background */
+        /* Professional dark blue gradient background */
         .stApp {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #1e3a8a 75%, #1e40af 100%);
         }
         
         /* Hide sidebar */
@@ -139,110 +139,138 @@ def main():
             display: none;
         }
         
-        /* Center container */
-        .main .block-container {
-            max-width: 500px !important;
-            margin: 0 auto !important;
-            padding: 3rem 2rem !important;
-        }
-        
-        /* Glass-morphism card for form */
-        [data-testid="stForm"] {
-            background: rgba(139, 92, 246, 0.25) !important;
-            backdrop-filter: blur(20px) !important;
-            -webkit-backdrop-filter: blur(20px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.18) !important;
-            border-radius: 20px !important;
-            padding: 2.5rem 2rem !important;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
-        }
-        
-        /* All text white */
-        label, p, span, div, .stMarkdown {
+        /* All white text */
+        label, p, span, div, .stMarkdown, h1, h2, h3 {
             color: white !important;
         }
         
-        /* Glass effect inputs */
+        /* Professional input fields - clean white/gray */
         input {
-            background: rgba(255, 255, 255, 0.18) !important;
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            border-radius: 12px !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 2px solid #e2e8f0 !important;
+            border-radius: 10px !important;
             padding: 0.875rem 1rem !important;
-            color: white !important;
-            font-size: 0.95rem !important;
+            color: #1e293b !important;
+            font-size: 1rem !important;
+            transition: all 0.2s ease !important;
         }
         
         input::placeholder {
-            color: rgba(255, 255, 255, 0.6) !important;
+            color: #94a3b8 !important;
         }
         
         input:focus {
-            background: rgba(255, 255, 255, 0.25) !important;
-            border-color: rgba(255, 255, 255, 0.5) !important;
-            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
+            background: white !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+            outline: none !important;
         }
         
-        /* Cyan/Teal button like Lucy */
+        /* Professional blue button */
         .stButton button {
-            background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%) !important;
-            color: #0f172a !important;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
             border: none !important;
-            border-radius: 12px !important;
+            border-radius: 10px !important;
             padding: 0.875rem 2rem !important;
             font-weight: 600 !important;
             width: 100% !important;
             font-size: 1rem !important;
             transition: all 0.3s ease !important;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4) !important;
         }
         
         .stButton button:hover {
             transform: translateY(-2px) !important;
-            box-shadow: 0 10px 30px rgba(6, 182, 212, 0.4) !important;
-            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%) !important;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.5) !important;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
         }
         
-        /* Titles - white and centered */
-        h1, h2, h3 {
+        /* Secondary button (outlined) */
+        .stButton button[kind="secondary"] {
+            background: transparent !important;
+            border: 2px solid rgba(255, 255, 255, 0.3) !important;
             color: white !important;
-            text-align: center !important;
-            font-weight: 700 !important;
+            box-shadow: none !important;
         }
         
-        h1 {
-            font-size: 2rem !important;
-            margin-bottom: 2rem !important;
+        .stButton button[kind="secondary"]:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
         }
         
-        /* Selectbox glass effect */
+        /* Clean selectbox */
         [data-baseweb="select"] {
-            background: rgba(255, 255, 255, 0.18) !important;
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            border-radius: 12px !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 2px solid #e2e8f0 !important;
+            border-radius: 10px !important;
         }
         
         [data-baseweb="select"] > div {
-            background: transparent !important;
-            color: white !important;
+            color: #1e293b !important;
         }
         
-        /* Checkbox styling */
+        /* Checkbox */
         [data-testid="stCheckbox"] {
             color: white !important;
         }
         
-        /* Expander (forgot password) */
-        [data-testid="stExpander"] {
-            background: rgba(255, 255, 255, 0.1) !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
-            border-radius: 12px !important;
+        /* Info/Success/Error messages */
+        .stSuccess {
+            background: rgba(16, 185, 129, 0.15) !important;
+            border: 1px solid rgba(16, 185, 129, 0.3) !important;
+            border-radius: 10px !important;
+            color: white !important;
         }
         
-        /* Success/Error messages glass effect */
-        .stSuccess, .stError, .stInfo {
-            background: rgba(255, 255, 255, 0.15) !important;
-            border: 1px solid rgba(255, 255, 255, 0.25) !important;
-            border-radius: 12px !important;
-            backdrop-filter: blur(10px) !important;
+        .stError {
+            background: rgba(239, 68, 68, 0.15) !important;
+            border: 1px solid rgba(239, 68, 68, 0.3) !important;
+            border-radius: 10px !important;
+            color: white !important;
+        }
+        
+        .stInfo {
+            background: rgba(59, 130, 246, 0.15) !important;
+            border: 1px solid rgba(59, 130, 246, 0.3) !important;
+            border-radius: 10px !important;
+            color: white !important;
+        }
+        
+        /* Expander */
+        [data-testid="stExpander"] {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 10px !important;
+        }
+        
+        [data-testid="stExpander"] summary {
+            color: white !important;
+        }
+        
+        /* Forms - clean white cards */
+        [data-testid="stForm"] {
+            background: rgba(255, 255, 255, 0.95) !important;
+            padding: 2.5rem 2rem !important;
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+        
+        /* Form labels and text should be dark */
+        [data-testid="stForm"] label,
+        [data-testid="stForm"] p,
+        [data-testid="stForm"] span,
+        [data-testid="stForm"] div {
+            color: #1e293b !important;
+        }
+        
+        /* Form headings */
+        [data-testid="stForm"] h1,
+        [data-testid="stForm"] h2,
+        [data-testid="stForm"] h3,
+        [data-testid="stForm"] h4 {
+            color: #0f172a !important;
         }
         </style>
         """, unsafe_allow_html=True)
