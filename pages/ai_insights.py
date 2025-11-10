@@ -26,65 +26,36 @@ try:
 except ImportError:
     AI_SERVICE_AVAILABLE = False
 
-# Get subscription details
-try:
-    from services.subscription_manager import SubscriptionManager
-    subscription_manager = SubscriptionManager()
-    has_subscription = True
-except Exception as e:
-    subscription_manager = None
-    has_subscription = False
-
-# Get user's org code
-user_data = st.session_state.get('user_data', {})
-org_code = user_data.get('organization_code')
-
-# Check if user can use this feature
-if has_subscription and subscription_manager:
-    subscription = subscription_manager.get_organization_subscription(org_code)
-    plan_name = subscription.get('plan', 'basic')
-    
-    if plan_name == 'enterprise':
-        can_use = True
-        status = "Unlimited ✨"
-    else:
-        can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'ai_insights')
-else:
-    plan_name = 'demo'
-    can_use = True
-    status = "Demo Mode"
-
-# Show usage status at top
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Plan", plan_name.title())
-with col2:
-    if has_subscription and subscription_manager:
-        if plan_name == 'professional':
-            usage = subscription_manager.get_feature_usage(org_code, 'ai_insights')
-            limit = subscription_manager.get_feature_limit(org_code, 'ai_insights')
-            st.metric("Usage This Month", f"{usage}/{limit}")
-        elif plan_name == 'enterprise':
-            st.metric("Usage", "Unlimited ✨")
-        else:
-            st.metric("Usage", "Not Available")
-    else:
-        st.metric("Usage", "Demo - Unlimited")
-with col3:
-    if not can_use and plan_name == 'basic':
-        st.warning("⚠️ Upgrade Required")
-    elif not can_use:
-        st.error("❌ Limit Reached")
-    else:
-        st.success("✅ Available")
-
-# If feature not available, show upgrade prompt
-if not can_use:
-    show_upgrade_prompt(plan_name, status)
-    return
-
 
 def show():
+
+    if 'user_data' not in st.session_state or not st.session_state.user_data:
+        st.error("⚠️ Please log in to access AI Legal Insights")
+        st.stop()
+        return
+    
+    try:
+        user_email = DataSecurity.get_current_user_email()
+        if not user_email:
+            st.error("⚠️ Session expired. Please log in again.")
+            st.stop()
+            return
+    except Exception as e:
+        st.error(f"⚠️ Authentication error: {e}")
+        st.stop()
+        return
+    
+    user_data = st.session_state.get('user_data', {})
+    org_code = user_data.get('organization_code', user_email)
+    
+    try:
+        from services.subscription_manager import SubscriptionManager
+        subscription_manager = SubscriptionManager()
+        has_subscription = True
+    except Exception as e:
+        subscription_manager = None
+        has_subscription = False
+    
     # Professional header styling
     st.markdown("""
     <style>
@@ -327,6 +298,50 @@ def show():
     
     DataSecurity.require_auth("AI Legal Insights")
 
+    if has_subscription and subscription_manager:
+        subscription = subscription_manager.get_organization_subscription(org_code)
+        plan_name = subscription.get('plan', 'basic')
+        
+        if plan_name == 'enterprise':
+            can_use = True
+            status = "Unlimited ✨"
+        else:
+            can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'ai_insights')
+    else:
+        plan_name = 'demo'
+        can_use = True
+        status = "Demo Mode"
+    
+    col_status1, col_status2, col_status3 = st.columns(3)
+    
+    with col_status1:
+        st.metric("Plan", plan_name.title())
+    
+    with col_status2:
+        if has_subscription and subscription_manager:
+            if plan_name == 'professional':
+                usage = subscription_manager.get_feature_usage(org_code, 'ai_insights')
+                limit = subscription_manager.get_feature_limit(org_code, 'ai_insights')
+                st.metric("Usage This Month", f"{usage}/{limit}")
+            elif plan_name == 'enterprise':
+                st.metric("Usage", "Unlimited ✨")
+            else:
+                st.metric("Usage", "Not Available")
+        else:
+            st.metric("Usage", "Demo - Unlimited")
+    
+    with col_status3:
+        if not can_use and plan_name == 'basic':
+            st.warning("⚠️ Upgrade Required")
+        elif not can_use:
+            st.error("❌ Limit Reached")
+        else:
+            st.success("✅ Available")
+    
+    if not can_use:
+        show_upgrade_prompt(plan_name, status)
+        return
+    
     # Main tabs
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📄 Document Intelligence", 
@@ -356,8 +371,6 @@ def show():
         show_predictive_insights()
 
 def show_upgrade_prompt(current_plan, status):
-    """Show upgrade prompt when feature is not available"""
-    
     st.markdown("---")
     
     if current_plan == 'basic':
@@ -369,7 +382,7 @@ def show_upgrade_prompt(current_plan, status):
             border-radius: 20px;
             text-align: center;
         ">
-            <h2>🚀 Unlock AI-Powered Insights</h2>
+            <h2>🚀 Unlock AI-Powered Legal Insights</h2>
             <p style="font-size: 1.2rem; margin: 1rem 0;">
                 Upgrade to Professional or Enterprise to access advanced AI features
             </p>
@@ -407,7 +420,7 @@ def show_upgrade_prompt(current_plan, status):
                 st.session_state['current_page'] = 'Billing Management'
                 st.rerun()
     
-    else:  # Professional plan, limit reached
+    else:
         st.markdown("""
         <div style="
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -447,7 +460,7 @@ def show_upgrade_prompt(current_plan, status):
 
 
 
-def show_document_intelligence():
+def show_document_intelligence(subscription_manager, org_code, plan_name, has_subscription):
     """Document reading and analysis interface"""
     st.subheader("📄 Document Intelligence & Analysis")
     
@@ -500,18 +513,34 @@ def show_document_intelligence():
     
     # Document analysis results
     if uploaded_file and analyze_button:
-        with st.spinner("Analyzing document..."):
-            # Extract text from document
+        with st.spinner("🤖 AI is analyzing document... This may take 30-60 seconds..."):
             extracted_text = extract_document_text(uploaded_file)
             
             if extracted_text:
-                # Perform AI analysis
                 analysis_results = perform_document_analysis(extracted_text, analysis_type)
                 
-                # Display results
+                # Increment usage
+                if has_subscription and subscription_manager and plan_name != 'enterprise':
+                    subscription_manager.increment_feature_usage(org_code, 'ai_insights')
+                
                 display_analysis_results(analysis_results, extracted_text, uploaded_file.name)
-            else:
-                st.error("Could not extract text from the document. Please check the file format.")
+        
+        st.success("✅ Analysis complete!")
+        
+        # Show updated usage
+        if has_subscription and subscription_manager:
+            if plan_name == 'professional':
+                usage = subscription_manager.get_feature_usage(org_code, 'ai_insights')
+                limit = subscription_manager.get_feature_limit(org_code, 'ai_insights')
+                remaining = limit - usage
+                if remaining > 0:
+                    st.info(f"📊 You have {remaining} analyses remaining this month")
+                else:
+                    st.warning("⚠️ You've reached your monthly limit")
+            elif plan_name == 'enterprise':
+                st.success("✨ Unlimited analyses available")
+        else:
+            st.success("✨ Demo mode - Unlimited analyses")
     
     # Batch processing section
     st.divider()
