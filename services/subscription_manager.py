@@ -344,95 +344,16 @@ class EnhancedAuthService:
         with col1:
             st.markdown("""
             <div style="padding: 2rem; text-align: center;">
-                <!-- 3D Logo at Top -->
-                <div style="
-                    width: 280px;
-                    height: 280px;
-                    position: relative;
-                    margin: 1rem auto 2rem auto;
-                ">
-                    <!-- Floating layer 1 -->
-                    <div style="
-                        position: absolute;
-                        width: 220px;
-                        height: 90px;
-                        background: linear-gradient(135deg, rgba(236, 72, 153, 0.6) 0%, rgba(168, 85, 247, 0.5) 100%);
-                        border-radius: 50%;
-                        top: 10px;
-                        left: 30px;
-                        transform: rotate(-18deg);
-                        filter: blur(2px);
-                        box-shadow: 0 15px 40px rgba(236, 72, 153, 0.3);
-                    "></div>
-                    
-                    <!-- Floating layer 2 -->
-                    <div style="
-                        position: absolute;
-                        width: 220px;
-                        height: 90px;
-                        background: linear-gradient(135deg, rgba(59, 130, 246, 0.7) 0%, rgba(6, 182, 212, 0.6) 100%);
-                        border-radius: 50%;
-                        top: 90px;
-                        left: 50px;
-                        transform: rotate(12deg);
-                        filter: blur(2px);
-                        box-shadow: 0 15px 40px rgba(59, 130, 246, 0.4);
-                    "></div>
-                    
-                    <!-- Floating layer 3 -->
-                    <div style="
-                        position: absolute;
-                        width: 220px;
-                        height: 90px;
-                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(99, 102, 241, 0.7) 100%);
-                        border-radius: 50%;
-                        top: 170px;
-                        left: 30px;
-                        transform: rotate(-12deg);
-                        box-shadow: 0 15px 40px rgba(139, 92, 246, 0.5);
-                    "></div>
+                <div style="width: 280px; height: 280px; position: relative; margin: 1rem auto 2rem auto;">
+                    <div style="position: absolute; width: 220px; height: 90px; background: linear-gradient(135deg, rgba(236, 72, 153, 0.6) 0%, rgba(168, 85, 247, 0.5) 100%); border-radius: 50%; top: 10px; left: 30px; transform: rotate(-18deg); filter: blur(2px); box-shadow: 0 15px 40px rgba(236, 72, 153, 0.3);"></div>
+                    <div style="position: absolute; width: 220px; height: 90px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.7) 0%, rgba(6, 182, 212, 0.6) 100%); border-radius: 50%; top: 90px; left: 50px; transform: rotate(12deg); filter: blur(2px); box-shadow: 0 15px 40px rgba(59, 130, 246, 0.4);"></div>
+                    <div style="position: absolute; width: 220px; height: 90px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(99, 102, 241, 0.7) 100%); border-radius: 50%; top: 170px; left: 30px; transform: rotate(-12deg); box-shadow: 0 15px 40px rgba(139, 92, 246, 0.5);"></div>
                 </div>
-                
-                <!-- Company Name -->
-                <h1 style="
-                    color: white;
-                    font-size: 2.8rem;
-                    font-weight: 800;
-                    margin-bottom: 0.5rem;
-                    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-                ">⚖️ Prolexis Analytics</h1>
-                
-                <p style="
-                    color: rgba(255, 255, 255, 0.85);
-                    font-size: 1.2rem;
-                    font-weight: 300;
-                    margin-bottom: 3rem;
-                ">Legal Intelligence Platform</p>
-                
-                <!-- Feature Highlights -->
-                <div style="
-                    text-align: left;
-                    max-width: 400px;
-                    margin: 0 auto;
-                    padding: 2rem;
-                    background: rgba(255, 255, 255, 0.06);
-                    backdrop-filter: blur(10px);
-                    border-radius: 16px;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                ">
-                    <h3 style="
-                        color: white;
-                        font-size: 1.3rem;
-                        margin-bottom: 1.5rem;
-                        font-weight: 600;
-                    ">✨ Platform Features</h3>
-                    <ul style="
-                        color: rgba(255, 255, 255, 0.9);
-                        font-size: 1rem;
-                        line-height: 2;
-                        list-style: none;
-                        padding: 0;
-                    ">
+                <h1 style="color: white; font-size: 2.8rem; font-weight: 800; margin-bottom: 0.5rem; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);">⚖️ Prolexis Analytics</h1>
+                <p style="color: rgba(255, 255, 255, 0.85); font-size: 1.2rem; font-weight: 300; margin-bottom: 3rem;">Legal Intelligence Platform</p>
+                <div style="text-align: left; max-width: 400px; margin: 0 auto; padding: 2rem; background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(10px); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                    <h3 style="color: white; font-size: 1.3rem; margin-bottom: 1.5rem; font-weight: 600;">✨ Platform Features</h3>
+                    <ul style="color: rgba(255, 255, 255, 0.9); font-size: 1rem; line-height: 2; list-style: none; padding: 0;">
                         <li>🤖 AI Document Analysis</li>
                         <li>📊 Business Intelligence</li>
                         <li>⚖️ Case Comparison</li>
