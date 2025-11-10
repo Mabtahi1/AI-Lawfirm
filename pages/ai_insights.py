@@ -26,6 +26,64 @@ try:
 except ImportError:
     AI_SERVICE_AVAILABLE = False
 
+# Get subscription details
+try:
+    from services.subscription_manager import SubscriptionManager
+    subscription_manager = SubscriptionManager()
+    has_subscription = True
+except Exception as e:
+    subscription_manager = None
+    has_subscription = False
+
+# Get user's org code
+user_data = st.session_state.get('user_data', {})
+org_code = user_data.get('organization_code')
+
+# Check if user can use this feature
+if has_subscription and subscription_manager:
+    subscription = subscription_manager.get_organization_subscription(org_code)
+    plan_name = subscription.get('plan', 'basic')
+    
+    if plan_name == 'enterprise':
+        can_use = True
+        status = "Unlimited ✨"
+    else:
+        can_use, status = subscription_manager.can_use_feature_with_limit(org_code, 'ai_insights')
+else:
+    plan_name = 'demo'
+    can_use = True
+    status = "Demo Mode"
+
+# Show usage status at top
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Plan", plan_name.title())
+with col2:
+    if has_subscription and subscription_manager:
+        if plan_name == 'professional':
+            usage = subscription_manager.get_feature_usage(org_code, 'ai_insights')
+            limit = subscription_manager.get_feature_limit(org_code, 'ai_insights')
+            st.metric("Usage This Month", f"{usage}/{limit}")
+        elif plan_name == 'enterprise':
+            st.metric("Usage", "Unlimited ✨")
+        else:
+            st.metric("Usage", "Not Available")
+    else:
+        st.metric("Usage", "Demo - Unlimited")
+with col3:
+    if not can_use and plan_name == 'basic':
+        st.warning("⚠️ Upgrade Required")
+    elif not can_use:
+        st.error("❌ Limit Reached")
+    else:
+        st.success("✅ Available")
+
+# If feature not available, show upgrade prompt
+if not can_use:
+    show_upgrade_prompt(plan_name, status)
+    return
+
+
 def show():
     # Professional header styling
     st.markdown("""
