@@ -329,17 +329,8 @@ class EnhancedAuthService:
         return True, "Account created successfully"
     
     def show_login(self):
-        """Show login/signup page with payment integration"""
+        """Show login/signup page with Lucy-style split-screen layout"""
         
-        # CSS Styling
-        st.markdown("""
-        <style>
-        .stApp {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    
         # Initialize session state for form toggle
         if 'show_signup_form' not in st.session_state:
             st.session_state.show_signup_form = False
@@ -347,18 +338,105 @@ class EnhancedAuthService:
         if 'show_payment_form' not in st.session_state:
             st.session_state.show_payment_form = False
     
-        # Center container
-        col1, col2, col3 = st.columns([1, 2, 1])
+        # Two-column layout: Left (info) + Right (form)
+        col_left, col_right = st.columns([1, 1])
         
-        with col2:
-            # Header
+        # ============= LEFT SIDE: Branding & Info =============
+        with col_left:
             st.markdown("""
-            <div style="text-align: center; margin-bottom: 2rem;">
-                <h1 style="color: white;">⚖️ LegalDoc Pro</h1>
-                <p style="color: white; font-size: 1.1rem;">Enterprise Legal Management Platform</p>
+            <div style="padding: 3rem 2rem; height: 100vh; display: flex; flex-direction: column; justify-content: center;">
+                <!-- Logo and Title -->
+                <div style="margin-bottom: 3rem;">
+                    <div style="font-size: 3.5rem; margin-bottom: 1rem;">⚖️</div>
+                    <h1 style="color: white; font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem;">
+                        LegalDoc Pro
+                    </h1>
+                    <p style="color: rgba(255, 255, 255, 0.8); font-size: 1.1rem;">
+                        Innovation Starts Here
+                    </p>
+                </div>
+                
+                <!-- Description -->
+                <div style="margin-bottom: 3rem;">
+                    <h2 style="color: white; font-size: 1.8rem; font-weight: 600; margin-bottom: 1.5rem;">
+                        You will be using one of<br/>
+                        LegalDoc Pro's core applications:<br/>
+                        <span style="color: #22d3ee;">Enterprise Legal Management™</span>
+                    </h2>
+                </div>
+                
+                <!-- 3D Decorative Element (CSS-based) -->
+                <div style="position: relative; width: 250px; height: 250px; margin: 2rem 0;">
+                    <div style="
+                        position: absolute;
+                        width: 200px;
+                        height: 80px;
+                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(6, 182, 212, 0.3) 100%);
+                        border-radius: 50%;
+                        top: 0;
+                        left: 0;
+                        transform: rotate(-15deg);
+                        backdrop-filter: blur(10px);
+                        box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+                    "></div>
+                    <div style="
+                        position: absolute;
+                        width: 200px;
+                        height: 80px;
+                        background: linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(139, 92, 246, 0.3) 100%);
+                        border-radius: 50%;
+                        top: 60px;
+                        left: 30px;
+                        transform: rotate(15deg);
+                        backdrop-filter: blur(10px);
+                        box-shadow: 0 10px 30px rgba(6, 182, 212, 0.3);
+                    "></div>
+                    <div style="
+                        position: absolute;
+                        width: 200px;
+                        height: 80px;
+                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.5) 0%, rgba(6, 182, 212, 0.4) 100%);
+                        border-radius: 50%;
+                        top: 120px;
+                        left: 0;
+                        transform: rotate(-10deg);
+                        backdrop-filter: blur(10px);
+                        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+                    "></div>
+                </div>
+                
+                <!-- Feature Buttons -->
+                <div style="margin-top: 2rem;">
+                    <button style="
+                        background: rgba(255, 255, 255, 0.15);
+                        border: 1px solid rgba(255, 255, 255, 0.3);
+                        color: white;
+                        padding: 0.75rem 1.5rem;
+                        border-radius: 12px;
+                        margin-right: 1rem;
+                        margin-bottom: 1rem;
+                        font-weight: 500;
+                        cursor: pointer;
+                        backdrop-filter: blur(10px);
+                    ">What to Expect?</button>
+                    <button style="
+                        background: rgba(255, 255, 255, 0.15);
+                        border: 1px solid rgba(255, 255, 255, 0.3);
+                        color: white;
+                        padding: 0.75rem 1.5rem;
+                        border-radius: 12px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        backdrop-filter: blur(10px);
+                    ">Other Features</button>
+                </div>
             </div>
             """, unsafe_allow_html=True)
     
+        # ============= RIGHT SIDE: Form =============
+        with col_right:
+            st.markdown('<div style="padding: 2rem;">', unsafe_allow_html=True)
+            
             # ============= PAYMENT FORM (Step 2) =============
             if st.session_state.show_payment_form:
                 from services.payment_service import PaymentService
@@ -417,7 +495,7 @@ class EnhancedAuthService:
             
             # ============= LOGIN FORM =============
             elif not st.session_state.show_signup_form:
-                st.markdown("### 🔑 Login to Your Account")
+                st.markdown('<h2 style="color: white; text-align: center; margin-bottom: 2rem;">Log In to LegalDoc Pro™</h2>', unsafe_allow_html=True)
                 
                 # Demo accounts
                 with st.expander("📝 Demo Accounts"):
@@ -428,13 +506,21 @@ class EnhancedAuthService:
                     """)
                 
                 with st.form("login_form"):
-                    email = st.text_input("📧 Email", placeholder="your@email.com")
-                    password = st.text_input("🔒 Password", type="password")
-                    remember_me = st.checkbox("Remember me")
+                    st.text_input("Your Email", placeholder="your@email.com", key="login_email")
+                    st.text_input("Your Password", type="password", key="login_password")
                     
-                    submitted = st.form_submit_button("🚀 Login", use_container_width=True)
+                    col_check, col_forgot = st.columns(2)
+                    with col_check:
+                        st.checkbox("Remember")
+                    with col_forgot:
+                        st.markdown('<p style="text-align: right; color: rgba(255,255,255,0.8);">Forgotten?</p>', unsafe_allow_html=True)
+                    
+                    submitted = st.form_submit_button("Log In", use_container_width=True)
                     
                     if submitted:
+                        email = st.session_state.get('login_email', '')
+                        password = st.session_state.get('login_password', '')
+                        
                         if not email or not password:
                             st.error("⚠️ Please enter email and password")
                         else:
@@ -449,13 +535,14 @@ class EnhancedAuthService:
                 
                 # Signup button
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("✨ Don't have an account? Sign Up", use_container_width=True):
+                st.markdown('<p style="text-align: center; color: white;">Don\'t have an account?</p>', unsafe_allow_html=True)
+                if st.button("Sign Up", use_container_width=True):
                     st.session_state.show_signup_form = True
                     st.rerun()
     
             # ============= SIGNUP FORM (Step 1) =============
             else:
-                st.markdown("### ✨ Create Your Account")
+                st.markdown('<h2 style="color: white; text-align: center; margin-bottom: 2rem;">Create Your Account</h2>', unsafe_allow_html=True)
                 st.info("💳 Payment required to activate your account")
                 
                 with st.form("signup_form"):
@@ -541,6 +628,8 @@ class EnhancedAuthService:
                 if st.button("🔑 Already have an account? Login", use_container_width=True):
                     st.session_state.show_signup_form = False
                     st.rerun()
+            
+            st.markdown('</div>', unsafe_allow_html=True)
 
 
     def _handle_forgot_password(self, email):
