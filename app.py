@@ -126,12 +126,14 @@ def main():
     # ========== AUTHENTICATION GATE ==========
     # If user is NOT logged in, show ONLY login page (no sidebar, no other pages)
     if not st.session_state.get('logged_in', False):
-        # Apply professional login page styling
+        # Apply Lucy-style professional login page styling
         st.markdown("""
         <style>
-        /* Clean professional background */
+        /* Lucy-style purple gradient background */
         .stApp {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+            position: relative;
+            overflow: hidden;
         }
         
         /* Hide sidebar on login page */
@@ -139,73 +141,151 @@ def main():
             display: none;
         }
         
-        /* Center container with clean white card */
+        /* Center the login container */
         .main .block-container {
-            max-width: 500px !important;
+            max-width: 1200px !important;
             margin: 0 auto !important;
-            padding: 2rem !important;
+            padding: 4rem 2rem !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
         }
         
-        /* Clean white card for login form */
+        /* Glass-morphism login card */
         [data-testid="stForm"] {
-            background: white !important;
-            padding: 3rem 2rem !important;
-            border-radius: 16px !important;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
+            background: rgba(139, 92, 246, 0.3) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            padding: 3rem 2.5rem !important;
+            border-radius: 24px !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+            max-width: 450px;
+            margin: 0 auto;
         }
         
-        /* Professional input fields */
+        /* White text for form labels */
+        label, .stMarkdown {
+            color: white !important;
+            font-weight: 500 !important;
+        }
+        
+        /* Clean input fields with subtle glass effect */
         input {
-            border-radius: 8px !important;
-            border: 2px solid #e2e8f0 !important;
-            padding: 0.75rem !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            border-radius: 12px !important;
+            padding: 0.875rem 1rem !important;
             font-size: 1rem !important;
+            color: white !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.6) !important;
         }
         
         input:focus {
-            border-color: #3b82f6 !important;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+            background: rgba(255, 255, 255, 0.2) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
+            outline: none !important;
         }
         
-        /* Clean button styling */
+        /* Cyan/Teal button like Lucy */
         .stButton button {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-            color: white !important;
+            background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%) !important;
+            color: #0f172a !important;
             border: none !important;
-            border-radius: 8px !important;
-            padding: 0.75rem 2rem !important;
+            border-radius: 12px !important;
+            padding: 0.875rem 2rem !important;
             font-weight: 600 !important;
             width: 100% !important;
             font-size: 1rem !important;
-            transition: all 0.2s ease !important;
+            transition: all 0.3s ease !important;
+            text-transform: none !important;
         }
         
         .stButton button:hover {
             transform: translateY(-2px) !important;
-            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3) !important;
+            box-shadow: 0 10px 30px rgba(6, 182, 212, 0.4) !important;
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%) !important;
         }
         
-        /* Clean typography */
-        h1 {
+        /* Title styling - white and centered */
+        h1, h2, h3 {
             color: white !important;
             font-weight: 700 !important;
             text-align: center !important;
             margin-bottom: 0.5rem !important;
         }
         
-        h2, h3 {
-            color: #1e293b !important;
-            font-weight: 600 !important;
+        h1 {
+            font-size: 2rem !important;
+            margin-bottom: 2rem !important;
         }
         
-        /* Remove excessive spacing */
+        /* Selectbox styling */
+        [data-baseweb="select"] {
+            background: rgba(255, 255, 255, 0.15) !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            border-radius: 12px !important;
+        }
+        
+        [data-baseweb="select"] > div {
+            background: transparent !important;
+            color: white !important;
+        }
+        
+        /* Checkbox styling */
+        [data-testid="stCheckbox"] label {
+            color: white !important;
+        }
+        
+        /* Links and text */
+        a, p {
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        /* Remove extra spacing */
         .element-container {
             margin-bottom: 1rem !important;
         }
         
-        /* Professional selectbox */
-        [data-baseweb="select"] {
-            border-radius: 8px !important;
+        /* Info messages */
+        .stAlert {
+            background: rgba(6, 182, 212, 0.2) !important;
+            border: 1px solid rgba(6, 182, 212, 0.3) !important;
+            border-radius: 12px !important;
+            color: white !important;
+        }
+        
+        /* Success messages */
+        .stSuccess {
+            background: rgba(34, 197, 94, 0.2) !important;
+            border: 1px solid rgba(34, 197, 94, 0.3) !important;
+            border-radius: 12px !important;
+            color: white !important;
+        }
+        
+        /* Error messages */
+        .stError {
+            background: rgba(239, 68, 68, 0.2) !important;
+            border: 1px solid rgba(239, 68, 68, 0.3) !important;
+            border-radius: 12px !important;
+            color: white !important;
+        }
+        
+        /* Expander styling for forgot password */
+        [data-testid="stExpander"] {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 12px !important;
+        }
+        
+        [data-testid="stExpander"] summary {
+            color: white !important;
         }
         </style>
         """, unsafe_allow_html=True)
