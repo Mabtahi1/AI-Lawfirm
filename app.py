@@ -26,6 +26,21 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+
+    /* Hide toolbar with refresh button */
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+    
+    [data-testid="stDecoration"] {
+        display: none !important;
+    }
+    
+    /* Hide top padding */
+    .block-container {
+        padding-top: 1rem !important;
+    }
+
     
     .main {
         font-family: 'Inter', sans-serif;
@@ -248,29 +263,31 @@ def main():
             color: white !important;
         }
         
-        /* Forms - clean white cards */
+        /* Forms - glass effect cards */
         [data-testid="stForm"] {
-            background: rgba(255, 255, 255, 0.95) !important;
+            background: rgba(30, 41, 59, 0.7) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
             padding: 2.5rem 2rem !important;
             border-radius: 20px !important;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
             border: 1px solid rgba(255, 255, 255, 0.2) !important;
         }
         
-        /* Form labels and text should be dark */
+        /* Form labels and text should be white */
         [data-testid="stForm"] label,
         [data-testid="stForm"] p,
         [data-testid="stForm"] span,
         [data-testid="stForm"] div {
-            color: #1e293b !important;
+            color: white !important;
         }
         
-        /* Form headings */
+        /* Form headings white */
         [data-testid="stForm"] h1,
         [data-testid="stForm"] h2,
         [data-testid="stForm"] h3,
         [data-testid="stForm"] h4 {
-            color: #0f172a !important;
+            color: white !important;
         }
         </style>
         """, unsafe_allow_html=True)
