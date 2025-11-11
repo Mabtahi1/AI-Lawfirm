@@ -131,19 +131,25 @@ class PaymentService:
         plan_details = SUBSCRIPTION_PLANS[plan_name]
         amount = plan_details['price']
         
-        st.markdown(f"""
-        <div style="
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 16px;
-            text-align: center;
-            margin-bottom: 2rem;
-        ">
-            <h2>{plan_details['name']}</h2>
-            <h1>${amount}/month</h1>
-            <p>3-day free trial • Cancel anytime</p>
-        </div>
+        # ADD THIS CSS FIX HERE
+        st.markdown("""
+        <style>
+        [data-baseweb="select"] > div,
+        [data-baseweb="select"] input {
+            color: #1e293b !important;
+            background: white !important;
+        }
+        
+        [data-baseweb="menu"] li {
+            color: #1e293b !important;
+            background: white !important;
+        }
+        
+        input {
+            color: #1e293b !important;
+            background: white !important;
+        }
+        </style>
         """, unsafe_allow_html=True)
         
         # Payment form
