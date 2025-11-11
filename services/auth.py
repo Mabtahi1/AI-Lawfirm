@@ -135,6 +135,11 @@ class AuthService:
         # CHECK PERSISTENT STORAGE
         from services.local_storage import LocalStorage
         existing_users = LocalStorage.load_all_users()
+
+        #Debug
+        st.write("DEBUG: Existing users:", list(existing_users.keys()))
+        st.write("DEBUG: Trying to register:", email)
+        st.write("DEBUG: Email exists?", email in existing_users)
         
         if email in existing_users:
             return False, "An account with this email already exists"
