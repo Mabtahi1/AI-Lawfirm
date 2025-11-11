@@ -134,20 +134,33 @@ class PaymentService:
         # ADD THIS CSS FIX HERE
         st.markdown("""
         <style>
+        /* Force dropdown text to be dark */
         [data-baseweb="select"] > div,
-        [data-baseweb="select"] input {
+        [data-baseweb="select"] > div > div,
+        [data-baseweb="select"] input,
+        .stSelectbox [data-baseweb="select"] > div {
             color: #1e293b !important;
             background: white !important;
         }
         
-        [data-baseweb="menu"] li {
+        /* Dropdown menu items */
+        [data-baseweb="menu"] li,
+        [data-baseweb="popover"] div,
+        [role="listbox"] li,
+        [role="option"] {
             color: #1e293b !important;
             background: white !important;
         }
         
-        input {
+        /* All inputs dark text */
+        input, textarea, select {
             color: #1e293b !important;
             background: white !important;
+        }
+        
+        /* Form inside elements */
+        [data-testid="stForm"] [data-baseweb="select"] * {
+            color: #1e293b !important;
         }
         </style>
         """, unsafe_allow_html=True)
