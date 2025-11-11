@@ -4,6 +4,12 @@ import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
+# Admin panel check
+if st.query_params.get("admin") == "true":
+    import admin_panel
+    admin_panel.show()
+    st.stop()
+
 # Load environment variables
 load_dotenv()
 
