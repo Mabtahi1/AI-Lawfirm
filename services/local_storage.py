@@ -55,6 +55,7 @@ class LocalStorage:
         except Exception as e:
             st.error(f"Error saving document: {e}")
             return None
+            
     @staticmethod
     def load_all_users():
         """Load all registered users from Firebase"""
@@ -66,15 +67,15 @@ class LocalStorage:
             if not users:
                 return {}
         
-        # Convert back to email keys
-        email_users = {}
-        for safe_key, user_data in users.items():
-            original_email = user_data.get('original_email', safe_key.replace('_DOT_', '.').replace('_AT_', '@'))
-            email_users[original_email] = user_data
-        
-        return email_users
-    except:
-        return {}
+            # Convert back to email keys
+            email_users = {}
+            for safe_key, user_data in users.items():
+                original_email = user_data.get('original_email', safe_key.replace('_DOT_', '.').replace('_AT_', '@'))
+                email_users[original_email] = user_data
+            
+            return email_users
+        except:
+            return {}
     
     @staticmethod
     def save_all_users(users_dict):
