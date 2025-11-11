@@ -168,6 +168,11 @@ class AuthService:
         # Save to persistent storage
         existing_users[email] = user_data
         LocalStorage.save_all_users(existing_users)
+
+        # DEBUG
+        st.write("DEBUG: Saved users:", existing_users)
+        loaded = LocalStorage.load_all_users()
+        st.write("DEBUG: Loaded back:", loaded)
         
         # Create subscription with trial
         subscription_data = {
