@@ -62,9 +62,19 @@ class LocalStorage:
             from services.firebase_config import db
             ref = db.reference('users')
             users = ref.get()
-            return users if users else {}
-        except:
-            return {}
+            
+            if not users:
+                return {}
+        
+        # Convert back to email keys
+        email_users = {}
+        for safe_key, user_data in users.items():
+            original_email = user_data.get('original_email', safe_key.replace('_DOT_', '.').replace('_AT_', '@'))
+            email_users[original_email] = user_data
+        
+        return email_users
+    except:
+        return {}
     
     @staticmethod
     def save_all_users(users_dict):
@@ -72,9 +82,19 @@ class LocalStorage:
         try:
             from services.firebase_config import db
             ref = db.reference('users')
-            ref.set(users_dict)
+            
+            # Convert emails to safe keys (replace . and @ and other invalid chars)
+            safe_users = {}
+            for email, user_data in users_dict.items():
+                safe_key = email.replace('.', '_DOT_').replace('@', '_AT_').replace('$', '_').replace('#', '_').replace('[', '_').replace(']', '_').replace('/', '_')
+                safe_users[safe_key] = {
+                    **user_data,
+                    'original_email': email  # Store original email
+                }
+            
+            ref.set(safe_users)
         except Exception as e:
-            st.error(f"Error saving users: {e}")
+            st.error(f"❌ Error saving users: {e}")
     @staticmethod
     def get_document(user_email, document_id, filename):
         """Retrieve document file"""
