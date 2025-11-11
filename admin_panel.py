@@ -14,7 +14,7 @@ def show():
     if not st.session_state.admin_logged_in:
         password = st.text_input("Admin Password", type="password")
         if st.button("Login"):
-            if password == "admin123":  # Change this!
+            if password == "admin123medi1369":  # Change this!
                 st.session_state.admin_logged_in = True
                 st.rerun()
             else:
