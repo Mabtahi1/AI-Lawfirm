@@ -338,7 +338,10 @@ class EnhancedAuthService:
             'created_at': datetime.now().isoformat()
         }
         LocalStorage.save_all_users(existing_users)
-        
+        # DEBUG - verify save
+        st.success(f"✅ User {email} saved to storage")
+        import time
+        time.sleep(5)  
         return True, "Account created successfully"
     
     def show_login(self):
