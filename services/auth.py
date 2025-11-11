@@ -16,9 +16,16 @@ class AuthService:
         if 'user_data' not in st.session_state:
             st.session_state.user_data = {}
         
-        # Initialize users database
+        # Load from persistent storage FIRST
+        from services.local_storage import LocalStorage
+        stored_users = LocalStorage.load_all_users()
+        
+        # Initialize users database - merge with stored users
         if 'users_db' not in st.session_state:
-            st.session_state.users_db = self.get_demo_users()
+            demo_users = self.get_demo_users()
+            # Merge: stored users + demo users
+            demo_users.update(stored_users)
+            st.session_state.users_db = demo_users
         
         # Initialize subscriptions
         if 'subscriptions' not in st.session_state:
