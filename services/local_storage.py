@@ -57,23 +57,24 @@ class LocalStorage:
             return None
     @staticmethod
     def load_all_users():
-        """Load all registered users (email only for checking duplicates)"""
-        user_file = os.path.join(LocalStorage.DATA_DIR, "all_users.json")
-        os.makedirs(LocalStorage.DATA_DIR, exist_ok=True)
-        
-        if os.path.exists(user_file):
-            with open(user_file, 'r') as f:
-                return json.load(f)
-        return {}
+        """Load all registered users from Firebase"""
+        try:
+            from services.firebase_config import db
+            ref = db.reference('users')
+            users = ref.get()
+            return users if users else {}
+        except:
+            return {}
     
     @staticmethod
     def save_all_users(users_dict):
-        """Save all users"""
-        user_file = os.path.join(LocalStorage.DATA_DIR, "all_users.json")
-        os.makedirs(LocalStorage.DATA_DIR, exist_ok=True)
-        
-        with open(user_file, 'w') as f:
-            json.dump(users_dict, f, indent=2)
+        """Save all users to Firebase"""
+        try:
+            from services.firebase_config import db
+            ref = db.reference('users')
+            ref.set(users_dict)
+        except Exception as e:
+            st.error(f"Error saving users: {e}")
     @staticmethod
     def get_document(user_email, document_id, filename):
         """Retrieve document file"""
