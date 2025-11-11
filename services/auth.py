@@ -166,13 +166,24 @@ class AuthService:
         st.session_state.users_db[email] = user_data
         
         # Save to persistent storage
+        # Save to persistent storage
         existing_users[email] = user_data
-        LocalStorage.save_all_users(existing_users)
-
-        # DEBUG
-        st.write("DEBUG: Saved users:", existing_users)
+        st.write("🔍 BEFORE SAVE - Users to save:", list(existing_users.keys()))
+        
+        try:
+            LocalStorage.save_all_users(existing_users)
+            st.success("✅ save_all_users() completed")
+        except Exception as e:
+            st.error(f"❌ save_all_users() failed: {e}")
+        
+        # Verify it saved
         loaded = LocalStorage.load_all_users()
-        st.write("DEBUG: Loaded back:", loaded)
+        st.write("🔍 AFTER SAVE - Loaded users:", list(loaded.keys()))
+        
+        if email in loaded:
+            st.success(f"✅ {email} confirmed in storage!")
+        else:
+            st.error(f"❌ {email} NOT in storage after save!")
         
         # Create subscription with trial
         subscription_data = {
