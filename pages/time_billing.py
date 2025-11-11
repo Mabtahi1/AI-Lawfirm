@@ -10,13 +10,6 @@ import os
 # ADD THIS:
 from services.data_security import DataSecurity
 
-# DELETE these old functions:
-# - DATA_DIR = "user_data"
-# - ensure_data_dir()
-# - get_user_file()
-# - save_user_data()
-# - load_user_data()
-
 # REPLACE auto_save_user_data with:
 def auto_save_user_data():
     """SECURE auto-save billing data"""
@@ -41,6 +34,15 @@ def get_attr(item, attr, default=None):
     if isinstance(item, dict):
         return item.get(attr, default)
     return getattr(item, attr, default)
+
+# ✅ NEW: Helper function to safely convert dates to strings
+def get_date_string(date_val):
+    """Convert date to YYYY-MM-DD string format"""
+    if isinstance(date_val, str):
+        return date_val
+    elif isinstance(date_val, datetime):
+        return date_val.strftime('%Y-%m-%d')
+    return ''
 
 def show():
     """Display the Time & Billing page"""
@@ -656,7 +658,7 @@ def show_time_tracking():
         # Quick stats
         st.markdown("### 📊 Today's Time")
         today = datetime.now().strftime('%Y-%m-%d')
-        today_entries = [e for e in st.session_state.time_entries if get_attr(e, 'date', '') == today]
+        today_entries = [e for e in st.session_state.time_entries if get_date_string(get_attr(e, 'date', '')) == today]
         today_hours = sum(get_attr(e, 'hours', 0) for e in today_entries)
         today_amount = sum(get_attr(e, 'amount', 0) for e in today_entries)
         
@@ -696,7 +698,7 @@ def show_time_tracking():
         entries_data = []
         for e in filtered_entries:
             entries_data.append({
-                'Date': get_attr(e, 'date', ''),
+                'Date': get_date_string(get_attr(e, 'date', '')),
                 'Matter': get_attr(e, 'matter', ''),
                 'Activity': get_attr(e, 'activity', ''),
                 'Description': get_attr(e, 'description', ''),
@@ -780,7 +782,7 @@ def show_invoice_generator():
             
             for entry in selected_entries:
                 entry_id = get_attr(entry, 'id', 0)
-                entry_date = get_attr(entry, 'date', '')
+                entry_date = get_date_string(get_attr(entry, 'date', ''))
                 entry_activity = get_attr(entry, 'activity', '')
                 entry_hours = get_attr(entry, 'hours', 0)
                 entry_amount = get_attr(entry, 'amount', 0)
@@ -995,12 +997,12 @@ def show_billing_reports():
     if report_type == "Revenue Summary":
         st.markdown("#### 💰 Revenue Summary")
         
-        # Group by month
+        # ✅ FIX: Group by month with proper date handling
         revenue_by_month = {}
         for entry in time_entries:
-            entry_date = getattr(entry, 'date', '')
-            if entry_date:
-                month = entry_date[:7]  # YYYY-MM
+            entry_date_str = get_date_string(getattr(entry, 'date', ''))
+            if entry_date_str:
+                month = entry_date_str[:7]  # YYYY-MM (now safe since it's a string)
                 revenue_by_month[month] = revenue_by_month.get(month, 0) + getattr(entry, 'amount', 0)
         
         if revenue_by_month:
