@@ -325,6 +325,19 @@ class EnhancedAuthService:
             'start_date': datetime.now().isoformat(),
             'billing_cycle': 'monthly'
         }
+
+        # Save to persistent storage
+        from services.local_storage import LocalStorage
+        existing_users = LocalStorage.load_all_users()
+        existing_users[email] = {
+            'password': st.session_state.users[email]['password'],
+            'name': name,
+            'organization_name': organization_name,
+            'organization_code': organization_code,
+            'role': 'subscription_owner',
+            'created_at': datetime.now().isoformat()
+        }
+        LocalStorage.save_all_users(existing_users)
         
         return True, "Account created successfully"
     
