@@ -225,6 +225,24 @@ class PaymentService:
             """)
         
         return False
+
+    
+    def refund_payment(self, payment_intent_id, amount=None):
+    """Refund a payment (amount in dollars, None = full refund)"""
+    
+    if not self.stripe_secret:
+        return True
+    
+    try:
+        refund = stripe.Refund.create(
+            payment_intent=payment_intent_id,
+            amount=int(amount * 100) if amount else None
+        )
+        return refund
+    except Exception as e:
+        st.error(f"Refund failed: {str(e)}")
+        return None
+
     
     def process_payment(self, card_number, exp_month, exp_year, cvv, card_name, amount, plan_name):
         """Process a payment"""
