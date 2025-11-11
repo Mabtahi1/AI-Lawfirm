@@ -125,19 +125,22 @@ class AuthService:
         email = email.lower().strip()
         organization_code = organization_code.lower().strip()
         
-        # Validation
-        if email in st.session_state.users_db:
+        # CHECK PERSISTENT STORAGE
+        from services.local_storage import LocalStorage
+        existing_users = LocalStorage.load_all_users()
+        
+        if email in existing_users:
             return False, "An account with this email already exists"
         
-        if any(u.get('organization_code') == organization_code 
-               for u in st.session_state.users_db.values()):
+        # Check organization code in persistent storage
+        if any(u.get('organization_code') == organization_code for u in existing_users.values()):
             return False, "This organization code is already taken"
         
         if len(password) < 8:
             return False, "Password must be at least 8 characters"
         
         # Create user
-        st.session_state.users_db[email] = {
+        user_data = {
             'password': self.hash_password(password),
             'name': name,
             'organization_name': organization_name,
@@ -147,14 +150,23 @@ class AuthService:
             'email_verified': True
         }
         
+        # Save to session state
+        st.session_state.users_db[email] = user_data
+        
+        # Save to persistent storage
+        existing_users[email] = user_data
+        LocalStorage.save_all_users(existing_users)
+        
         # Create subscription with trial
-        st.session_state.subscriptions[organization_code] = {
+        subscription_data = {
             'plan': plan,
             'status': 'trial',
             'start_date': datetime.now().isoformat(),
             'trial_end': (datetime.now() + timedelta(days=14)).isoformat(),
             'billing_cycle': 'monthly'
         }
+        
+        st.session_state.subscriptions[organization_code] = subscription_data
         
         return True, "Account created successfully"
     
