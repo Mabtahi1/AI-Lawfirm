@@ -281,71 +281,112 @@ class EnhancedAuthService:
         
         return False
     
-    def register(self, email, password, name, organization_name, organization_code, plan='basic'):
-        """Register new user - FIXED VERSION"""
+   def register(self, email, password, name, organization_name, organization_code, plan='basic', join_existing=False):
+        """Register new user - with multi-user support for Enterprise"""
         email = email.lower().strip()
         organization_code = organization_code.lower().strip()
         
-        # Initialize users if not exists
+        # Initialize
         if 'users' not in st.session_state:
             st.session_state.users = {}
-        
-        # Initialize subscriptions if not exists
         if 'subscriptions' not in st.session_state:
             st.session_state.subscriptions = {}
         
-        # Validation - CHECK FIREBASE
+        # Load existing users
         from services.local_storage import LocalStorage
         existing_users = LocalStorage.load_all_users()
         
+        # Check if email already exists
         if email in existing_users:
             return False, "Email already exists"
         
-        # Check organization code
-        if any(u.get('organization_code') == organization_code for u in existing_users.values()):
-            return False, "Organization code already taken"
-        
-        # Create user with proper nested structure
-        st.session_state.users[email] = {
-            'password': AuthTokenManager.hash_password(password),
-            'data': {
+        # Check if joining existing organization
+        if join_existing:
+            # Verify org exists
+            existing_org = None
+            for user_data in existing_users.values():
+                if user_data.get('organization_code') == organization_code:
+                    existing_org = user_data
+                    break
+            
+            if not existing_org:
+                return False, "Organization code not found"
+            
+            # Get existing org subscription
+            existing_subscription = st.session_state.subscriptions.get(organization_code)
+            if not existing_subscription or existing_subscription.get('plan') != 'enterprise':
+                return False, "Only Enterprise plans support multiple users"
+            
+            # Add user to existing org (NOT subscription owner)
+            st.session_state.users[email] = {
+                'password': AuthTokenManager.hash_password(password),
+                'data': {
+                    'name': name,
+                    'first_name': name.split()[0] if name else '',
+                    'email': email,
+                    'organization_name': existing_org.get('organization_name'),
+                    'organization_code': organization_code,
+                    'role': 'member',  # Not owner
+                    'is_subscription_owner': False,
+                    'email_verified': True,
+                    'created_at': datetime.now().isoformat()
+                }
+            }
+            
+            # Save to Firebase
+            existing_users[email] = {
+                'password': st.session_state.users[email]['password'],
                 'name': name,
-                'first_name': name.split()[0] if name else '',
-                'email': email,
+                'organization_name': existing_org.get('organization_name'),
+                'organization_code': organization_code,
+                'role': 'member',
+                'created_at': datetime.now().isoformat()
+            }
+            LocalStorage.save_all_users(existing_users)
+            
+            return True, "Added to organization successfully"
+        
+        else:
+            # New organization - check org code not taken
+            if any(u.get('organization_code') == organization_code for u in existing_users.values()):
+                return False, "Organization code already taken"
+            
+            # Create new user (subscription owner)
+            st.session_state.users[email] = {
+                'password': AuthTokenManager.hash_password(password),
+                'data': {
+                    'name': name,
+                    'first_name': name.split()[0] if name else '',
+                    'email': email,
+                    'organization_name': organization_name,
+                    'organization_code': organization_code,
+                    'role': 'subscription_owner',
+                    'is_subscription_owner': True,
+                    'email_verified': True,
+                    'created_at': datetime.now().isoformat()
+                }
+            }
+            
+            # Create subscription
+            st.session_state.subscriptions[organization_code] = {
+                'plan': plan,
+                'status': 'active',
+                'start_date': datetime.now().isoformat(),
+                'billing_cycle': 'monthly'
+            }
+            
+            # Save to Firebase
+            existing_users[email] = {
+                'password': st.session_state.users[email]['password'],
+                'name': name,
                 'organization_name': organization_name,
                 'organization_code': organization_code,
                 'role': 'subscription_owner',
-                'is_subscription_owner': True,
-                'email_verified': True,
                 'created_at': datetime.now().isoformat()
             }
-        }
-        
-        # Create subscription (ACTIVE - payment already processed)
-        st.session_state.subscriptions[organization_code] = {
-            'plan': plan,
-            'status': 'active',
-            'start_date': datetime.now().isoformat(),
-            'billing_cycle': 'monthly'
-        }
-
-        # Save to persistent storage
-        from services.local_storage import LocalStorage
-        existing_users = LocalStorage.load_all_users()
-        existing_users[email] = {
-            'password': st.session_state.users[email]['password'],
-            'name': name,
-            'organization_name': organization_name,
-            'organization_code': organization_code,
-            'role': 'subscription_owner',
-            'created_at': datetime.now().isoformat()
-        }
-        LocalStorage.save_all_users(existing_users)
-        # DEBUG - verify save
-        st.success(f"✅ User {email} saved to storage")
-        import time
-        time.sleep(5)  
-        return True, "Account created successfully"
+            LocalStorage.save_all_users(existing_users)
+            
+            return True, "Account created successfully"
     
     def show_login(self):
         """Beautiful professional login page"""
@@ -466,7 +507,28 @@ class EnhancedAuthService:
                         "Professional - $599/mo",
                         "Enterprise - $999/mo"
                     ])
+                    # ADD THIS - Join existing organization option
+                    st.markdown("---")
+                    join_existing = st.checkbox("Join an existing organization? (Enterprise only)")
                     
+                    if join_existing:
+                        st.info("💡 Ask your admin for the organization code")
+                        org_code = st.text_input("Organization Code", placeholder="Enter code from admin")
+                        org_name = "(Will use existing organization)"
+                        
+                        # No payment needed - joining existing subscription
+                        st.caption("✅ No payment required - using existing subscription")
+                    else:
+                        st.markdown("**Organization**")
+                        org_name = st.text_input("Firm Name", placeholder="Smith & Associates")
+                        
+                        if "Enterprise" in plan_option:
+                            org_code = st.text_input("Organization Code", placeholder="smithlaw")
+                            st.caption("Share this code with team members")
+                        else:
+                            org_code = email.split('@')[0].replace('.', '').replace('_', '')
+
+
                     agree = st.checkbox("I agree to Terms & authorize monthly billing")
                     
                     submitted = st.form_submit_button("Continue to Payment →", use_container_width=True, type="primary")
