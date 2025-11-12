@@ -281,7 +281,7 @@ class EnhancedAuthService:
         
         return False
     
-   def register(self, email, password, name, organization_name, organization_code, plan='basic', join_existing=False):
+    def register(self, email, password, name, organization_name, organization_code, plan='basic', join_existing=False):
         """Register new user - with multi-user support for Enterprise"""
         email = email.lower().strip()
         organization_code = organization_code.lower().strip()
@@ -326,7 +326,7 @@ class EnhancedAuthService:
                     'email': email,
                     'organization_name': existing_org.get('organization_name'),
                     'organization_code': organization_code,
-                    'role': 'member',  # Not owner
+                    'role': 'member',
                     'is_subscription_owner': False,
                     'email_verified': True,
                     'created_at': datetime.now().isoformat()
@@ -343,6 +343,19 @@ class EnhancedAuthService:
                 'created_at': datetime.now().isoformat()
             }
             LocalStorage.save_all_users(existing_users)
+            
+            # Send welcome email
+            try:
+                email_service = EmailService()
+                email_service.send_registration_confirmation_email(
+                    email=email,
+                    name=name,
+                    organization_name=existing_org.get('organization_name'),
+                    organization_code=organization_code,
+                    plan='enterprise'
+                )
+            except:
+                pass
             
             return True, "Added to organization successfully"
         
@@ -385,6 +398,19 @@ class EnhancedAuthService:
                 'created_at': datetime.now().isoformat()
             }
             LocalStorage.save_all_users(existing_users)
+            
+            # Send welcome email
+            try:
+                email_service = EmailService()
+                email_service.send_registration_confirmation_email(
+                    email=email,
+                    name=name,
+                    organization_name=organization_name,
+                    organization_code=organization_code,
+                    plan=plan
+                )
+            except:
+                pass
             
             return True, "Account created successfully"
     
@@ -481,14 +507,33 @@ class EnhancedAuthService:
                 st.markdown('<h2 style="color: white; text-align: center; margin-bottom: 1.5rem; font-weight: 700; font-size: 2rem;">Get Started</h2>', unsafe_allow_html=True)
                 
                 with st.form("signup_form"):
-                    st.markdown("**Organization**")
-                    org_name = st.text_input("Firm Name", placeholder="Smith & Associates")
-                    # Only show org code for Enterprise plan
-                    if "Enterprise" in plan_option:
-                        org_code = st.text_input("Organization Code", placeholder="smithlaw")
-                        st.caption("For multi-user access (Enterprise only)")
+                    # PLAN SELECTION FIRST
+                    st.markdown("**Plan**")
+                    plan_option = st.selectbox("Choose Plan", [
+                        "Starter - $299/mo",
+                        "Professional - $599/mo",
+                        "Enterprise - $999/mo"
+                    ])
+                    
+                    st.markdown("---")
+                    
+                    # Join existing option
+                    join_existing = st.checkbox("Join an existing organization? (Enterprise only)")
+                    
+                    if join_existing:
+                        st.info("💡 Ask your admin for the organization code")
+                        org_code = st.text_input("Organization Code", placeholder="Enter code from admin")
+                        org_name = ""
+                        st.caption("✅ No payment required - using existing subscription")
                     else:
-                        org_code = email.split('@')[0].replace('.', '').replace('_', '')  # Auto-generate
+                        st.markdown("**Organization**")
+                        org_name = st.text_input("Firm Name", placeholder="Smith & Associates")
+                        
+                        if "Enterprise" in plan_option:
+                            org_code = st.text_input("Organization Code", placeholder="smithlaw")
+                            st.caption("Share this code with team members")
+                        else:
+                            org_code = ""  # Will be auto-generated from email
                     
                     st.markdown("**Your Information**")
                     col_a, col_b = st.columns(2)
@@ -501,42 +546,20 @@ class EnhancedAuthService:
                     password = st.text_input("Password", type="password", placeholder="Min. 8 characters")
                     confirm_password = st.text_input("Confirm Password", type="password")
                     
-                    st.markdown("**Plan**")
-                    plan_option = st.selectbox("Choose Plan", [
-                        "Starter - $299/mo",
-                        "Professional - $599/mo",
-                        "Enterprise - $999/mo"
-                    ])
-                    # ADD THIS - Join existing organization option
-                    st.markdown("---")
-                    join_existing = st.checkbox("Join an existing organization? (Enterprise only)")
-                    
-                    if join_existing:
-                        st.info("💡 Ask your admin for the organization code")
-                        org_code = st.text_input("Organization Code", placeholder="Enter code from admin")
-                        org_name = "(Will use existing organization)"
-                        
-                        # No payment needed - joining existing subscription
-                        st.caption("✅ No payment required - using existing subscription")
-                    else:
-                        st.markdown("**Organization**")
-                        org_name = st.text_input("Firm Name", placeholder="Smith & Associates")
-                        
-                        if "Enterprise" in plan_option:
-                            org_code = st.text_input("Organization Code", placeholder="smithlaw")
-                            st.caption("Share this code with team members")
-                        else:
-                            org_code = email.split('@')[0].replace('.', '').replace('_', '')
-
-
                     agree = st.checkbox("I agree to Terms & authorize monthly billing")
                     
                     submitted = st.form_submit_button("Continue to Payment →", use_container_width=True, type="primary")
                     
                     if submitted:
                         errors = []
-                        if not all([org_name, org_code, first_name, last_name, email, password]):
-                            errors.append("All fields required")
+                        
+                        if join_existing:
+                            if not all([org_code, first_name, last_name, email, password]):
+                                errors.append("All fields required")
+                        else:
+                            if not all([org_name, first_name, last_name, email, password]):
+                                errors.append("All fields required")
+                        
                         if password and len(password) < 8:
                             errors.append("Password must be 8+ characters")
                         if password != confirm_password:
@@ -548,14 +571,20 @@ class EnhancedAuthService:
                             for error in errors:
                                 st.error(f"⚠️ {error}")
                         else:
+                            # Auto-generate org code if not provided
+                            if not org_code and not join_existing:
+                                org_code = email.split('@')[0].replace('.', '').replace('_', '')
+                            
                             plan_name = "basic" if "Starter" in plan_option else ("professional" if "Professional" in plan_option else "enterprise")
+                            
                             st.session_state.temp_signup_data = {
                                 'email': email,
                                 'password': password,
                                 'name': f"{first_name} {last_name}",
                                 'organization_name': org_name,
                                 'organization_code': org_code,
-                                'plan': plan_name
+                                'plan': plan_name,
+                                'join_existing': join_existing
                             }
                             st.session_state.show_payment_form = True
                             st.rerun()
@@ -574,7 +603,7 @@ class EnhancedAuthService:
                 plan_name = signup_data.get('plan', 'basic')
                 plan_details = SUBSCRIPTION_PLANS.get(plan_name, {})
                 
-                st.info(f"""**{signup_data.get('organization_name')}**  
+                st.info(f"""**{signup_data.get('organization_name') or 'Joining Organization'}**  
                 {signup_data.get('email')}  
                 {plan_details.get('name')} - ${plan_details.get('price')}/month""")
                 
@@ -588,9 +617,8 @@ class EnhancedAuthService:
                         name=data['name'],
                         organization_name=data['organization_name'],
                         organization_code=data['organization_code'],
-                        plan=data['plan']
-                        join_existing=join_existing 
-
+                        plan=data['plan'],
+                        join_existing=data.get('join_existing', False)
                     )
                     if success:
                         st.session_state.show_payment_form = False
@@ -599,6 +627,8 @@ class EnhancedAuthService:
                         import time
                         time.sleep(2)
                         st.rerun()
+                    else:
+                        st.error(f"❌ {message}")
                 
                 payment_service.show_payment_form(plan_name=plan_name, on_success_callback=complete_registration)
                 
