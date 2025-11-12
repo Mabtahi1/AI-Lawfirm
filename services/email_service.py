@@ -38,7 +38,60 @@ class EmailService:
         except Exception as e:
             st.error(f"Failed to send email: {str(e)}")
             return False
-    
+            
+    def send_registration_confirmation_email(self, email, name, organization_name, organization_code, plan):
+        """Send confirmation email after registration"""
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+                .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
+                .info-box {{ background: white; padding: 15px; margin: 15px 0; border-left: 4px solid #667eea; border-radius: 5px; }}
+                .button {{ display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+                .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 12px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🎉 Welcome to Prolexis Analytics!</h1>
+                </div>
+                <div class="content">
+                    <h2>Hi {name},</h2>
+                    <p>Your account has been created successfully!</p>
+                    
+                    <div class="info-box">
+                        <strong>📋 Account Details:</strong><br>
+                        <strong>Plan:</strong> {plan.title()}<br>
+                        <strong>Organization:</strong> {organization_name}<br>
+                        <strong>Organization Code:</strong> {organization_code}
+                    </div>
+                    
+                    <p style="text-align: center;">
+                        <a href="https://prolexisanalytics.com/app/" class="button">Login Now</a>
+                    </p>
+                    
+                    <p>If you have any questions, contact us at support@prolexisanalytics.com</p>
+                </div>
+                <div class="footer">
+                    <p>© 2025 Prolexis Analytics. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(
+            to_email=email,
+            subject=f"Welcome to Prolexis Analytics - {plan.title()} Plan",
+            html_content=html_content
+        )
+        
     def send_verification_email(self, email, verification_token):
         """Send email verification link"""
         
