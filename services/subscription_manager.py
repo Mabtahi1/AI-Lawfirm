@@ -294,12 +294,15 @@ class EnhancedAuthService:
         if 'subscriptions' not in st.session_state:
             st.session_state.subscriptions = {}
         
-        # Validation
-        if email in st.session_state.users:
+        # Validation - CHECK FIREBASE
+        from services.local_storage import LocalStorage
+        existing_users = LocalStorage.load_all_users()
+        
+        if email in existing_users:
             return False, "Email already exists"
         
-        if any(u.get('data', {}).get('organization_code') == organization_code 
-               for u in st.session_state.users.values()):
+        # Check organization code
+        if any(u.get('organization_code') == organization_code for u in existing_users.values()):
             return False, "Organization code already taken"
         
         # Create user with proper nested structure
@@ -439,7 +442,12 @@ class EnhancedAuthService:
                 with st.form("signup_form"):
                     st.markdown("**Organization**")
                     org_name = st.text_input("Firm Name", placeholder="Smith & Associates")
-                    org_code = st.text_input("Organization Code", placeholder="smithlaw")
+                    # Only show org code for Enterprise plan
+                    if "Enterprise" in plan_option:
+                        org_code = st.text_input("Organization Code", placeholder="smithlaw")
+                        st.caption("For multi-user access (Enterprise only)")
+                    else:
+                        org_code = email.split('@')[0].replace('.', '').replace('_', '')  # Auto-generate
                     
                     st.markdown("**Your Information**")
                     col_a, col_b = st.columns(2)
