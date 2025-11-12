@@ -589,6 +589,8 @@ class EnhancedAuthService:
                         organization_name=data['organization_name'],
                         organization_code=data['organization_code'],
                         plan=data['plan']
+                        join_existing=join_existing 
+
                     )
                     if success:
                         st.session_state.show_payment_form = False
